@@ -2,7 +2,7 @@
 
 ## Project overview
 
-This repository is the DocuHub for a MetaTrader 5 indicator project. DocuHub means the repository documentation hub: it keeps project intent, validated rules, and agent constraints aligned before implementation starts.
+This repository isfor a MetaTrader 5 indicator project. DocuHub means the repository documentation hub: it keeps project intent, validated rules, and agent constraints aligned before implementation starts.
 
 The project goal is to build a MetaTrader 5 indicator based on:
 
