@@ -1,53 +1,67 @@
 #property copyright "SOT MVP"
 #property link      ""
-#property version   "1.00"
+#property version   "2.00"
 #property strict
 #property indicator_chart_window
 #property indicator_plots 0
 
-input int    InpSwingLookback      = 3;
-input int    InpMaxBarsToScan      = 300;
-input int    InpMaxZones           = 12;
-input int    InpZoneExtendBars     = 120;
-input int    InpATRPeriod          = 14;
-input double InpZoneATRBuffer      = 0.25;
-input int    InpCompressionBars    = 6;
-input double InpCompressionFactor  = 0.70;
-input double InpLargeBodyRatio     = 0.60;
-input double InpSmallBodyRatio     = 0.30;
-input double InpLongWickRatio      = 0.50;
-input bool   InpShowStructureLines = true;
-input color  InpBullishColor       = clrMediumSeaGreen;
-input color  InpBearishColor       = clrTomato;
-input color  InpSupportColor       = clrSeaGreen;
-input color  InpResistanceColor    = clrIndianRed;
-input color  InpFlippedColor       = clrDarkOrange;
-input color  InpCompressionColor   = clrSlateGray;
-input color  InpImportantColor     = clrGold;
-input color  InpContextColor       = clrWhite;
-input int    InpFillAlpha          = 45;
+input int    InpSwingConfirmBars       = 3;
+input int    InpMaxBarsToScan          = 260;
+input int    InpMaxStructureLabels     = 24;
+input int    InpZoneExtendBars         = 160;
+input int    InpATRPeriod              = 14;
+input double InpZoneATRBuffer          = 0.30;
+input int    InpCompressionBars        = 7;
+input double InpCompressionATRFactor   = 0.72;
+input double InpSmallBodyRatio         = 0.25;
+input double InpLongWickRatio          = 0.55;
+input double InpImpulseBodyRatio       = 0.60;
+input int    InpMaxImportantCandles    = 14;
+input bool   InpShowStructureLines     = true;
+input color  InpBullishColor           = clrMediumSeaGreen;
+input color  InpBearishColor           = clrTomato;
+input color  InpSupportColor           = clrSeaGreen;
+input color  InpResistanceColor        = clrIndianRed;
+input color  InpFlippedColor           = clrDarkOrange;
+input color  InpCompressionColor       = clrSlateGray;
+input color  InpImportantColor         = clrGold;
+input color  InpContextColor           = clrWhite;
+input int    InpFillAlpha              = 42;
 
-#define SOT_PREFIX "SOT_MVP_"
-#define ZONE_SUPPORT 1
-#define ZONE_RESISTANCE 2
-#define CONTEXT_BULLISH 1
+#define SOT_PREFIX "SOT_MVP_V2_"
+#define SWING_HIGH_TYPE  1
+#define SWING_LOW_TYPE  -1
+#define CONTEXT_BULLISH  1
 #define CONTEXT_BEARISH -1
-#define CONTEXT_NEUTRAL 0
+#define CONTEXT_NEUTRAL  0
 
-struct VisualZone
+struct SwingPoint
 {
    int      type;
+   int      index;
+   double   price;
+   datetime time;
+   string   label;
+};
+
+struct ActiveZone
+{
+   bool     valid;
+   bool     broken;
+   bool     flipped;
+   int      type;
+   int      source_index;
    double   upper;
    double   lower;
    double   midpoint;
-   int      touches;
-   bool     flipped;
    datetime start_time;
+   datetime end_time;
    datetime break_time;
 };
 
-int    g_atr_handle = INVALID_HANDLE;
-string g_prefix;
+int      g_atr_handle = INVALID_HANDLE;
+string   g_prefix = "";
+datetime g_last_closed_bar_time = 0;
 
 int OnInit()
 {
@@ -56,14 +70,14 @@ int OnInit()
    if(g_atr_handle == INVALID_HANDLE)
       return INIT_FAILED;
 
-   IndicatorSetString(INDICATOR_SHORTNAME, "SOT MVP Market Reading");
-   DrawContextLabel("Context: loading");
+   IndicatorSetString(INDICATOR_SHORTNAME, "SOT MVP Market Structure V2");
+   DrawContextLabel("Neutral Context", InpContextColor);
    return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason)
 {
-   DeleteSOTObjects();
+   DeleteAllSOTObjects();
    if(g_atr_handle != INVALID_HANDLE)
       IndicatorRelease(g_atr_handle);
 }
@@ -88,22 +102,46 @@ int OnCalculate(const int rates_total,
    ArraySetAsSeries(low, true);
    ArraySetAsSeries(close, true);
 
+   if(prev_calculated > 0 && g_last_closed_bar_time == time[1])
+   {
+      UpdateMultiTimeframeContext();
+      return rates_total;
+   }
+   g_last_closed_bar_time = time[1];
+
    double atr[];
    ArraySetAsSeries(atr, true);
    int copied = CopyBuffer(g_atr_handle, 0, 0, rates_total, atr);
-   if(copied <= InpATRPeriod)
+   if(copied <= RequiredBars())
       return prev_calculated;
 
-   DeleteSOTObjects();
+   int scan_limit = MathMin(InpMaxBarsToScan, rates_total - InpSwingConfirmBars - 2);
+   if(scan_limit <= InpSwingConfirmBars + 2)
+      return prev_calculated;
 
-   int scan_limit = MathMin(InpMaxBarsToScan, rates_total - InpSwingLookback - 2);
-   VisualZone zones[];
-   ArrayResize(zones, 0);
+   DeleteObjectGroup("MS_");
+   DeleteObjectGroup("LINE_");
+   DeleteObjectGroup("IMP_");
+   DeleteObjectGroup("BRK_");
 
-   DetectAndDrawStructure(rates_total, scan_limit, time, open, high, low, close, atr, zones);
-   DrawZones(zones, time[0]);
-   DetectAndDrawCompression(rates_total, scan_limit, time, open, high, low, close, atr);
-   DetectAndDrawImportantCandles(rates_total, scan_limit, time, open, high, low, close, atr, zones);
+   SwingPoint swings[];
+   ActiveZone support_zone;
+   ActiveZone resistance_zone;
+   ActiveZone compression_zone;
+   ResetZone(support_zone);
+   ResetZone(resistance_zone);
+   ResetZone(compression_zone);
+
+   BuildConfirmedSwings(rates_total, scan_limit, time, high, low, swings);
+   DrawMarketStructure(swings, atr);
+   BuildActiveZones(scan_limit, time, high, low, close, atr, support_zone, resistance_zone);
+   DrawActiveZone("SUPPORT", support_zone, time[0]);
+   DrawActiveZone("RESISTANCE", resistance_zone, time[0]);
+   DrawBreakoutMarker("SUPPORT", support_zone);
+   DrawBreakoutMarker("RESISTANCE", resistance_zone);
+   DetectCompression(scan_limit, time, open, high, low, close, atr, compression_zone);
+   DrawCompressionZone(compression_zone, time[0]);
+   DrawImportantCandles(scan_limit, time, open, high, low, close, atr, support_zone, resistance_zone, compression_zone);
    UpdateMultiTimeframeContext();
 
    ChartRedraw(0);
@@ -112,11 +150,25 @@ int OnCalculate(const int rates_total,
 
 int RequiredBars()
 {
-   int value = InpATRPeriod + InpCompressionBars + InpSwingLookback * 2 + 10;
-   return MathMax(value, 80);
+   return MathMax(80, InpATRPeriod + InpCompressionBars + InpSwingConfirmBars * 2 + 20);
 }
 
-void DeleteSOTObjects()
+void ResetZone(ActiveZone &zone)
+{
+   zone.valid = false;
+   zone.broken = false;
+   zone.flipped = false;
+   zone.type = 0;
+   zone.source_index = -1;
+   zone.upper = 0.0;
+   zone.lower = 0.0;
+   zone.midpoint = 0.0;
+   zone.start_time = 0;
+   zone.end_time = 0;
+   zone.break_time = 0;
+}
+
+void DeleteAllSOTObjects()
 {
    int total = ObjectsTotal(0, 0, -1);
    for(int i = total - 1; i >= 0; --i)
@@ -127,18 +179,30 @@ void DeleteSOTObjects()
    }
 }
 
-color AlphaColor(const color base_color)
+void DeleteObjectGroup(const string group_name)
+{
+   string prefix = g_prefix + group_name;
+   int total = ObjectsTotal(0, 0, -1);
+   for(int i = total - 1; i >= 0; --i)
+   {
+      string name = ObjectName(0, i, 0, -1);
+      if(StringFind(name, prefix) == 0)
+         ObjectDelete(0, name);
+   }
+}
+
+color TransparentColor(const color base_color)
 {
    int alpha = MathMax(0, MathMin(255, InpFillAlpha));
    return (color)ColorToARGB(base_color, (uchar)alpha);
 }
 
-bool IsSwingHigh(const int index, const int rates_total, const double &high[])
+bool IsConfirmedSwingHigh(const int index, const int rates_total, const double &high[])
 {
-   if(index < InpSwingLookback || index + InpSwingLookback >= rates_total)
+   if(index <= InpSwingConfirmBars || index + InpSwingConfirmBars >= rates_total)
       return false;
 
-   for(int offset = 1; offset <= InpSwingLookback; ++offset)
+   for(int offset = 1; offset <= InpSwingConfirmBars; ++offset)
    {
       if(high[index] <= high[index - offset])
          return false;
@@ -148,12 +212,12 @@ bool IsSwingHigh(const int index, const int rates_total, const double &high[])
    return true;
 }
 
-bool IsSwingLow(const int index, const int rates_total, const double &low[])
+bool IsConfirmedSwingLow(const int index, const int rates_total, const double &low[])
 {
-   if(index < InpSwingLookback || index + InpSwingLookback >= rates_total)
+   if(index <= InpSwingConfirmBars || index + InpSwingConfirmBars >= rates_total)
       return false;
 
-   for(int offset = 1; offset <= InpSwingLookback; ++offset)
+   for(int offset = 1; offset <= InpSwingConfirmBars; ++offset)
    {
       if(low[index] >= low[index - offset])
          return false;
@@ -163,382 +227,378 @@ bool IsSwingLow(const int index, const int rates_total, const double &low[])
    return true;
 }
 
-void DetectAndDrawStructure(const int rates_total,
-                            const int scan_limit,
-                            const datetime &time[],
-                            const double &open[],
-                            const double &high[],
-                            const double &low[],
-                            const double &close[],
-                            const double &atr[],
-                            VisualZone &zones[])
+void BuildConfirmedSwings(const int rates_total,
+                          const int scan_limit,
+                          const datetime &time[],
+                          const double &high[],
+                          const double &low[],
+                          SwingPoint &swings[])
 {
-   double last_high = 0.0;
-   double last_low = 0.0;
-   datetime last_swing_time = 0;
-   double last_swing_price = 0.0;
-   int zone_count = 0;
+   ArrayResize(swings, 0);
+   double previous_high = 0.0;
+   double previous_low = 0.0;
 
-   for(int i = scan_limit; i >= InpSwingLookback; --i)
+   for(int i = scan_limit; i >= InpSwingConfirmBars + 1; --i)
    {
-      bool swing_high = IsSwingHigh(i, rates_total, high);
-      bool swing_low = IsSwingLow(i, rates_total, low);
-
-      if(swing_high)
+      if(IsConfirmedSwingHigh(i, rates_total, high))
       {
-         string label = (last_high <= 0.0 || high[i] > last_high) ? "HH" : "LH";
-         color text_color = (label == "HH") ? InpBullishColor : InpBearishColor;
-         DrawTextAtBar("MS_" + label + "_" + IntegerToString((int)time[i]), time[i], high[i] + atr[i] * 0.25, label, text_color, 8, ANCHOR_LOWER);
-         DrawStructureLine(last_swing_time, last_swing_price, time[i], high[i], text_color);
-         last_swing_time = time[i];
-         last_swing_price = high[i];
-         last_high = high[i];
-
-         if(zone_count < InpMaxZones)
-         {
-            AddZone(zones, ZONE_RESISTANCE, high[i], atr[i], time[i], time, high, low, close, i);
-            zone_count++;
-         }
+         SwingPoint swing;
+         swing.type = SWING_HIGH_TYPE;
+         swing.index = i;
+         swing.price = high[i];
+         swing.time = time[i];
+         swing.label = (previous_high <= 0.0 || high[i] > previous_high) ? "HH" : "LH";
+         previous_high = high[i];
+         AddSwing(swings, swing);
       }
 
-      if(swing_low)
+      if(IsConfirmedSwingLow(i, rates_total, low))
       {
-         string label = (last_low <= 0.0 || low[i] > last_low) ? "HL" : "LL";
-         color text_color = (label == "HL") ? InpBullishColor : InpBearishColor;
-         DrawTextAtBar("MS_" + label + "_" + IntegerToString((int)time[i]), time[i], low[i] - atr[i] * 0.25, label, text_color, 8, ANCHOR_UPPER);
-         DrawStructureLine(last_swing_time, last_swing_price, time[i], low[i], text_color);
-         last_swing_time = time[i];
-         last_swing_price = low[i];
-         last_low = low[i];
-
-         if(zone_count < InpMaxZones)
-         {
-            AddZone(zones, ZONE_SUPPORT, low[i], atr[i], time[i], time, high, low, close, i);
-            zone_count++;
-         }
+         SwingPoint swing;
+         swing.type = SWING_LOW_TYPE;
+         swing.index = i;
+         swing.price = low[i];
+         swing.time = time[i];
+         swing.label = (previous_low <= 0.0 || low[i] > previous_low) ? "HL" : "LL";
+         previous_low = low[i];
+         AddSwing(swings, swing);
       }
    }
 }
 
-void AddZone(VisualZone &zones[],
-             const int zone_type,
-             const double midpoint,
-             const double atr_value,
-             const datetime start_time,
-             const datetime &time[],
-             const double &high[],
-             const double &low[],
-             const double &close[],
-             const int source_index)
+void AddSwing(SwingPoint &swings[], const SwingPoint &swing)
 {
-   double width = MathMax(atr_value * InpZoneATRBuffer, _Point * 10.0);
-   VisualZone zone;
-   zone.type = zone_type;
+   int size = ArraySize(swings);
+   ArrayResize(swings, size + 1);
+   swings[size] = swing;
+}
+
+void DrawMarketStructure(const SwingPoint &swings[], const double &atr[])
+{
+   int total = ArraySize(swings);
+   int first = MathMax(0, total - InpMaxStructureLabels);
+   datetime previous_time = 0;
+   double previous_price = 0.0;
+
+   for(int i = first; i < total; ++i)
+   {
+      SwingPoint swing = swings[i];
+      color label_color = (swing.label == "HH" || swing.label == "HL") ? InpBullishColor : InpBearishColor;
+      double offset = MathMax(atr[swing.index] * 0.20, _Point * 20.0);
+      double price = swing.price + (swing.type == SWING_HIGH_TYPE ? offset : -offset);
+      ENUM_ANCHOR_POINT anchor = (swing.type == SWING_HIGH_TYPE) ? ANCHOR_LOWER : ANCHOR_UPPER;
+      string name = "MS_" + swing.label + "_" + IntegerToString((int)swing.time);
+      DrawTextObject(name, swing.time, price, swing.label, label_color, 8, anchor);
+
+      if(InpShowStructureLines && previous_time > 0)
+         DrawTrendLine("LINE_" + IntegerToString((int)previous_time) + "_" + IntegerToString((int)swing.time), previous_time, previous_price, swing.time, swing.price, label_color);
+
+      previous_time = swing.time;
+      previous_price = swing.price;
+   }
+}
+
+void BuildActiveZones(const int scan_limit,
+                      const datetime &time[],
+                      const double &high[],
+                      const double &low[],
+                      const double &close[],
+                      const double &atr[],
+                      ActiveZone &support_zone,
+                      ActiveZone &resistance_zone)
+{
+   bool support_found = false;
+   bool resistance_found = false;
+
+   for(int i = InpSwingConfirmBars + 1; i <= scan_limit; ++i)
+   {
+      if(!support_found && IsConfirmedSwingLow(i, scan_limit + InpSwingConfirmBars + 2, low))
+      {
+         CreateZone(SWING_LOW_TYPE, i, time, low[i], atr[i], support_zone);
+         EvaluateZoneBreak(support_zone, time, close, atr);
+         support_found = true;
+      }
+
+      if(!resistance_found && IsConfirmedSwingHigh(i, scan_limit + InpSwingConfirmBars + 2, high))
+      {
+         CreateZone(SWING_HIGH_TYPE, i, time, high[i], atr[i], resistance_zone);
+         EvaluateZoneBreak(resistance_zone, time, close, atr);
+         resistance_found = true;
+      }
+
+      if(support_found && resistance_found)
+         break;
+   }
+}
+
+void CreateZone(const int swing_type,
+                const int source_index,
+                const datetime &time[],
+                const double midpoint,
+                const double atr_value,
+                ActiveZone &zone)
+{
+   double width = MathMax(atr_value * InpZoneATRBuffer, _Point * 20.0);
+   zone.valid = true;
+   zone.broken = false;
+   zone.flipped = false;
+   zone.type = swing_type;
+   zone.source_index = source_index;
+   zone.midpoint = midpoint;
    zone.upper = midpoint + width;
    zone.lower = midpoint - width;
-   zone.midpoint = midpoint;
-   zone.touches = 0;
-   zone.flipped = false;
-   zone.start_time = start_time;
+   zone.start_time = time[source_index];
+   zone.end_time = 0;
    zone.break_time = 0;
-
-   for(int i = source_index - 1; i >= 0; --i)
-   {
-      bool touched = (high[i] >= zone.lower && low[i] <= zone.upper);
-      if(touched)
-         zone.touches++;
-
-      if(zone.type == ZONE_SUPPORT && close[i] < zone.lower - width)
-      {
-         zone.type = ZONE_RESISTANCE;
-         zone.flipped = true;
-         zone.break_time = time[i];
-         zone.touches = 0;
-      }
-      else if(zone.type == ZONE_RESISTANCE && close[i] > zone.upper + width)
-      {
-         zone.type = ZONE_SUPPORT;
-         zone.flipped = true;
-         zone.break_time = time[i];
-         zone.touches = 0;
-      }
-   }
-
-   int size = ArraySize(zones);
-   ArrayResize(zones, size + 1);
-   zones[size] = zone;
 }
 
-void DrawZones(const VisualZone &zones[], const datetime current_time)
+void EvaluateZoneBreak(ActiveZone &zone, const datetime &time[], const double &close[], const double &atr[])
 {
-   int total = ArraySize(zones);
-   datetime future_time = current_time + (datetime)(PeriodSeconds(_Period) * InpZoneExtendBars);
+   if(!zone.valid)
+      return;
 
-   for(int i = 0; i < total; ++i)
+   double break_buffer = MathMax(atr[zone.source_index] * InpZoneATRBuffer, _Point * 20.0);
+   for(int i = zone.source_index - 1; i >= 1; --i)
    {
-      string name = g_prefix + "ZONE_" + IntegerToString(i) + "_" + IntegerToString((int)zones[i].start_time);
-      color zone_color = InpSupportColor;
-      if(zones[i].type == ZONE_RESISTANCE)
-         zone_color = InpResistanceColor;
-      if(zones[i].flipped)
-         zone_color = InpFlippedColor;
-
-      if(ObjectCreate(0, name, OBJ_RECTANGLE, 0, zones[i].start_time, zones[i].upper, future_time, zones[i].lower))
+      if(zone.type == SWING_HIGH_TYPE && close[i] > zone.upper + break_buffer)
       {
-         ObjectSetInteger(0, name, OBJPROP_COLOR, AlphaColor(zone_color));
-         ObjectSetInteger(0, name, OBJPROP_FILL, true);
-         ObjectSetInteger(0, name, OBJPROP_BACK, true);
-         ObjectSetInteger(0, name, OBJPROP_WIDTH, MathMin(3, 1 + zones[i].touches));
-         ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+         zone.broken = true;
+         zone.flipped = true;
+         zone.break_time = time[i];
+         zone.end_time = time[i];
+         return;
       }
 
-      if(zones[i].flipped && zones[i].break_time > 0)
+      if(zone.type == SWING_LOW_TYPE && close[i] < zone.lower - break_buffer)
       {
-         string mark = g_prefix + "BROKEN_" + IntegerToString(i) + "_" + IntegerToString((int)zones[i].break_time);
-         DrawTextAtBarRaw(mark, zones[i].break_time, zones[i].midpoint, "FLIP", InpFlippedColor, 7, ANCHOR_CENTER);
+         zone.broken = true;
+         zone.flipped = true;
+         zone.break_time = time[i];
+         zone.end_time = time[i];
+         return;
       }
    }
 }
 
-void DetectAndDrawCompression(const int rates_total,
-                              const int scan_limit,
-                              const datetime &time[],
-                              const double &open[],
-                              const double &high[],
-                              const double &low[],
-                              const double &close[],
-                              const double &atr[])
+void DrawActiveZone(const string slot, const ActiveZone &zone, const datetime current_time)
 {
-   int boxes_drawn = 0;
-   int max_index = MathMin(scan_limit, rates_total - InpCompressionBars - 1);
-
-   for(int i = max_index; i >= 1 && boxes_drawn < 5; --i)
+   string name = g_prefix + "ZONE_" + TimeframeName(_Period) + "_" + slot;
+   if(!zone.valid)
    {
-      bool compressed = true;
+      ObjectDelete(0, name);
+      return;
+   }
+
+   datetime right_time = zone.broken ? zone.end_time : current_time + (datetime)(PeriodSeconds(_Period) * InpZoneExtendBars);
+   color zone_color = InpFlippedColor;
+   if(!zone.flipped)
+      zone_color = (zone.type == SWING_LOW_TYPE) ? InpSupportColor : InpResistanceColor;
+
+   UpsertRectangle(name, zone.start_time, zone.upper, right_time, zone.lower, zone_color, true, true, STYLE_SOLID, 1);
+}
+
+void DrawBreakoutMarker(const string slot, const ActiveZone &zone)
+{
+   if(!zone.valid || !zone.broken || zone.break_time <= 0)
+      return;
+
+   string name = "BRK_" + TimeframeName(_Period) + "_" + slot;
+   DrawTextObject(name, zone.break_time, zone.midpoint, "BREAK", InpFlippedColor, 8, ANCHOR_CENTER);
+}
+
+void DetectCompression(const int scan_limit,
+                       const datetime &time[],
+                       const double &open[],
+                       const double &high[],
+                       const double &low[],
+                       const double &close[],
+                       const double &atr[],
+                       ActiveZone &compression_zone)
+{
+   ResetZone(compression_zone);
+   int max_index = MathMin(scan_limit, scan_limit - InpCompressionBars + 1);
+
+   for(int i = 1; i <= max_index; ++i)
+   {
       double upper = high[i];
       double lower = low[i];
+      double range_sum = 0.0;
+      double atr_sum = 0.0;
+      bool narrowing = true;
 
       for(int j = i; j < i + InpCompressionBars; ++j)
       {
-         double candle_range = high[j] - low[j];
-         if(candle_range > atr[j] * InpCompressionFactor)
-         {
-            compressed = false;
-            break;
-         }
+         double range = high[j] - low[j];
+         range_sum += range;
+         atr_sum += atr[j];
          upper = MathMax(upper, high[j]);
          lower = MathMin(lower, low[j]);
+
+         if(j > i && range > (high[j - 1] - low[j - 1]) * 1.15)
+            narrowing = false;
       }
 
-      if(!compressed)
+      double average_range = range_sum / InpCompressionBars;
+      double average_atr = atr_sum / InpCompressionBars;
+      if(average_range > average_atr * InpCompressionATRFactor || !narrowing)
          continue;
 
-      datetime end_time = time[0] + (datetime)(PeriodSeconds(_Period) * 20);
-      for(int k = i - 1; k >= 0; --k)
+      compression_zone.valid = true;
+      compression_zone.type = 0;
+      compression_zone.source_index = i + InpCompressionBars - 1;
+      compression_zone.start_time = time[i + InpCompressionBars - 1];
+      compression_zone.end_time = time[0] + (datetime)(PeriodSeconds(_Period) * 30);
+      compression_zone.upper = upper;
+      compression_zone.lower = lower;
+      compression_zone.midpoint = (upper + lower) / 2.0;
+
+      for(int k = i - 1; k >= 1; --k)
       {
          if(close[k] > upper || close[k] < lower)
          {
-            end_time = time[k];
+            compression_zone.broken = true;
+            compression_zone.break_time = time[k];
+            compression_zone.end_time = time[k];
             break;
          }
       }
-
-      string name = g_prefix + "COMP_" + IntegerToString((int)time[i + InpCompressionBars - 1]);
-      if(ObjectCreate(0, name, OBJ_RECTANGLE, 0, time[i + InpCompressionBars - 1], upper, end_time, lower))
-      {
-         ObjectSetInteger(0, name, OBJPROP_COLOR, AlphaColor(InpCompressionColor));
-         ObjectSetInteger(0, name, OBJPROP_FILL, true);
-         ObjectSetInteger(0, name, OBJPROP_BACK, true);
-         ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DOT);
-         ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-      }
-      boxes_drawn++;
-      i -= InpCompressionBars - 1;
+      return;
    }
 }
 
-void DetectAndDrawImportantCandles(const int rates_total,
-                                   const int scan_limit,
-                                   const datetime &time[],
-                                   const double &open[],
-                                   const double &high[],
-                                   const double &low[],
-                                   const double &close[],
-                                   const double &atr[],
-                                   const VisualZone &zones[])
+void DrawCompressionZone(const ActiveZone &compression_zone, const datetime current_time)
 {
-   int max_marks = 60;
-   int marks = 0;
-
-   for(int i = MathMin(scan_limit, rates_total - 5); i >= 1 && marks < max_marks; --i)
+   string name = g_prefix + "COMPRESSION_ACTIVE";
+   if(!compression_zone.valid)
    {
+      ObjectDelete(0, name);
+      return;
+   }
+
+   datetime right_time = compression_zone.broken ? compression_zone.end_time : current_time + (datetime)(PeriodSeconds(_Period) * 30);
+   UpsertRectangle(name, compression_zone.start_time, compression_zone.upper, right_time, compression_zone.lower, InpCompressionColor, true, true, STYLE_DOT, 1);
+}
+
+void DrawImportantCandles(const int scan_limit,
+                          const datetime &time[],
+                          const double &open[],
+                          const double &high[],
+                          const double &low[],
+                          const double &close[],
+                          const double &atr[],
+                          const ActiveZone &support_zone,
+                          const ActiveZone &resistance_zone,
+                          const ActiveZone &compression_zone)
+{
+   int marks = 0;
+   int limit = MathMin(scan_limit, 90);
+
+   for(int i = 1; i <= limit && marks < InpMaxImportantCandles; ++i)
+   {
+      if(!IsNearVisualArea(close[i], atr[i], support_zone, resistance_zone, compression_zone))
+         continue;
+
       double range = MathMax(high[i] - low[i], _Point);
       double body = MathAbs(close[i] - open[i]);
       double body_ratio = body / range;
-      double upper_wick = high[i] - MathMax(open[i], close[i]);
-      double lower_wick = MathMin(open[i], close[i]) - low[i];
-      double upper_wick_ratio = upper_wick / range;
-      double lower_wick_ratio = lower_wick / range;
+      double upper_wick_ratio = (high[i] - MathMax(open[i], close[i])) / range;
+      double lower_wick_ratio = (MathMin(open[i], close[i]) - low[i]) / range;
 
-      bool small_body = (body_ratio <= InpSmallBodyRatio);
-      bool long_wick = (upper_wick_ratio >= InpLongWickRatio || lower_wick_ratio >= InpLongWickRatio);
-      bool contracting = ((high[i] - low[i]) < (high[i + 1] - low[i + 1]) && (high[i + 1] - low[i + 1]) < (high[i + 2] - low[i + 2]));
-      bool after_impulse = IsAfterImpulse(i, open, close, high, low);
-      bool near_zone = IsNearAnyZone(close[i], atr[i], zones);
-      bool breakout_bar = IsBreakoutBar(i, open, high, low, close, atr, zones);
+      bool rejection = (upper_wick_ratio >= InpLongWickRatio || lower_wick_ratio >= InpLongWickRatio);
+      bool small_after_impulse = (body_ratio <= InpSmallBodyRatio && HasRecentImpulse(i, open, high, low, close));
+      bool slowdown = IsMomentumSlowdown(i, open, high, low, close);
 
-      if(!(small_body || long_wick || contracting || (after_impulse && small_body) || near_zone || breakout_bar))
+      if(!rejection && !small_after_impulse && !slowdown)
          continue;
 
-      string text = "•";
+      string text = "!";
       color mark_color = InpImportantColor;
-      double y = high[i] + atr[i] * 0.18;
+      double y = high[i] + MathMax(atr[i] * 0.18, _Point * 25.0);
       ENUM_ANCHOR_POINT anchor = ANCHOR_LOWER;
 
-      if(long_wick)
+      if(rejection)
       {
          text = "R";
-         mark_color = (upper_wick_ratio > lower_wick_ratio) ? InpBearishColor : InpBullishColor;
          if(lower_wick_ratio > upper_wick_ratio)
          {
-            y = low[i] - atr[i] * 0.18;
+            y = low[i] - MathMax(atr[i] * 0.18, _Point * 25.0);
+            mark_color = InpBullishColor;
             anchor = ANCHOR_UPPER;
          }
+         else
+            mark_color = InpBearishColor;
       }
-      else if(breakout_bar)
-      {
-         text = "BO";
-         mark_color = InpFlippedColor;
-      }
-      else if(contracting)
-      {
-         text = "C";
-      }
-      else if(small_body)
-      {
-         text = "I";
-      }
+      else if(slowdown)
+         text = "S";
 
-      DrawTextAtBar("IC_" + IntegerToString((int)time[i]), time[i], y, text, mark_color, 8, anchor);
+      DrawTextObject("IMP_" + IntegerToString((int)time[i]), time[i], y, text, mark_color, 8, anchor);
       marks++;
    }
 }
 
-bool IsAfterImpulse(const int index,
-                    const double &open[],
-                    const double &close[],
-                    const double &high[],
-                    const double &low[])
+bool IsNearVisualArea(const double price,
+                      const double atr_value,
+                      const ActiveZone &support_zone,
+                      const ActiveZone &resistance_zone,
+                      const ActiveZone &compression_zone)
+{
+   double tolerance = MathMax(atr_value * 0.25, _Point * 20.0);
+   if(IsPriceNearZone(price, tolerance, support_zone))
+      return true;
+   if(IsPriceNearZone(price, tolerance, resistance_zone))
+      return true;
+   if(IsPriceNearZone(price, tolerance, compression_zone))
+      return true;
+   return false;
+}
+
+bool IsPriceNearZone(const double price, const double tolerance, const ActiveZone &zone)
+{
+   if(!zone.valid)
+      return false;
+   return (price >= zone.lower - tolerance && price <= zone.upper + tolerance);
+}
+
+bool HasRecentImpulse(const int index,
+                      const double &open[],
+                      const double &high[],
+                      const double &low[],
+                      const double &close[])
 {
    int direction = 0;
-   int large_count = 0;
+   int impulse_count = 0;
 
    for(int j = index + 1; j <= index + 3; ++j)
    {
       double range = MathMax(high[j] - low[j], _Point);
-      double body = MathAbs(close[j] - open[j]);
-      int candle_direction = 0;
-      if(close[j] > open[j])
-         candle_direction = 1;
-      else if(close[j] < open[j])
-         candle_direction = -1;
+      double body_ratio = MathAbs(close[j] - open[j]) / range;
+      int candle_direction = (close[j] > open[j]) ? 1 : ((close[j] < open[j]) ? -1 : 0);
 
-      if(body / range >= InpLargeBodyRatio)
+      if(body_ratio >= InpImpulseBodyRatio && candle_direction != 0)
       {
          if(direction == 0)
             direction = candle_direction;
-         if(direction == candle_direction && candle_direction != 0)
-            large_count++;
+         if(direction == candle_direction)
+            impulse_count++;
       }
    }
-
-   return (large_count >= 2);
+   return (impulse_count >= 2);
 }
 
-bool IsNearAnyZone(const double price, const double atr_value, const VisualZone &zones[])
+bool IsMomentumSlowdown(const int index,
+                        const double &open[],
+                        const double &high[],
+                        const double &low[],
+                        const double &close[])
 {
-   int total = ArraySize(zones);
-   double tolerance = MathMax(atr_value * 0.20, _Point * 10.0);
+   double body_0 = MathAbs(close[index] - open[index]);
+   double body_1 = MathAbs(close[index + 1] - open[index + 1]);
+   double body_2 = MathAbs(close[index + 2] - open[index + 2]);
+   double range_0 = high[index] - low[index];
+   double range_1 = high[index + 1] - low[index + 1];
+   double range_2 = high[index + 2] - low[index + 2];
 
-   for(int i = 0; i < total; ++i)
-   {
-      if(price >= zones[i].lower - tolerance && price <= zones[i].upper + tolerance)
-         return true;
-   }
-   return false;
-}
-
-bool IsBreakoutBar(const int index,
-                   const double &open[],
-                   const double &high[],
-                   const double &low[],
-                   const double &close[],
-                   const double &atr[],
-                   const VisualZone &zones[])
-{
-   int total = ArraySize(zones);
-   double range = MathMax(high[index] - low[index], _Point);
-   double body_ratio = MathAbs(close[index] - open[index]) / range;
-   if(body_ratio < InpLargeBodyRatio)
-      return false;
-
-   for(int i = 0; i < total; ++i)
-   {
-      double buffer = MathMax(atr[index] * InpZoneATRBuffer, _Point * 10.0);
-      if(close[index] > zones[i].upper + buffer || close[index] < zones[i].lower - buffer)
-         return true;
-   }
-   return false;
-}
-
-void DrawStructureLine(const datetime start_time,
-                       const double start_price,
-                       const datetime end_time,
-                       const double end_price,
-                       const color line_color)
-{
-   if(!InpShowStructureLines || start_time <= 0 || start_price <= 0.0)
-      return;
-
-   string name = g_prefix + "LINE_" + IntegerToString((int)start_time) + "_" + IntegerToString((int)end_time);
-   if(ObjectCreate(0, name, OBJ_TREND, 0, start_time, start_price, end_time, end_price))
-   {
-      ObjectSetInteger(0, name, OBJPROP_COLOR, line_color);
-      ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
-      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-   }
-}
-
-void DrawTextAtBar(const string suffix,
-                   const datetime bar_time,
-                   const double price,
-                   const string text,
-                   const color text_color,
-                   const int font_size,
-                   const ENUM_ANCHOR_POINT anchor)
-{
-   DrawTextAtBarRaw(g_prefix + suffix, bar_time, price, text, text_color, font_size, anchor);
-}
-
-void DrawTextAtBarRaw(const string name,
-                      const datetime bar_time,
-                      const double price,
-                      const string text,
-                      const color text_color,
-                      const int font_size,
-                      const ENUM_ANCHOR_POINT anchor)
-{
-   if(ObjectCreate(0, name, OBJ_TEXT, 0, bar_time, price))
-   {
-      ObjectSetString(0, name, OBJPROP_TEXT, text);
-      ObjectSetString(0, name, OBJPROP_FONT, "Arial");
-      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, font_size);
-      ObjectSetInteger(0, name, OBJPROP_COLOR, text_color);
-      ObjectSetInteger(0, name, OBJPROP_ANCHOR, anchor);
-      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-   }
+   return (body_0 < body_1 && body_1 < body_2 && range_0 <= range_1 && range_1 <= range_2);
 }
 
 void UpdateMultiTimeframeContext()
@@ -546,70 +606,37 @@ void UpdateMultiTimeframeContext()
    int m5_context = GetTimeframeContext(PERIOD_M5);
    int m15_context = GetTimeframeContext(PERIOD_M15);
 
-   string text = "M5: " + ContextName(m5_context) + " | M15: " + ContextName(m15_context) + " | Context: neutral";
-   color label_color = InpContextColor;
-
    if(m5_context == CONTEXT_BULLISH && m15_context == CONTEXT_BULLISH)
-   {
-      text = "M5: bullish | M15: bullish | Context: bullish";
-      label_color = InpBullishColor;
-   }
+      DrawContextLabel("Bullish Context", InpBullishColor);
    else if(m5_context == CONTEXT_BEARISH && m15_context == CONTEXT_BEARISH)
-   {
-      text = "M5: bearish | M15: bearish | Context: bearish";
-      label_color = InpBearishColor;
-   }
-
-   DrawContextLabel(text, label_color);
-}
-
-void DrawContextLabel(const string text, const color text_color = clrWhite)
-{
-   string name = g_prefix + "CONTEXT_LABEL";
-   if(ObjectFind(0, name) < 0)
-      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
-
-   ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, 12);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, 18);
-   ObjectSetString(0, name, OBJPROP_TEXT, text);
-   ObjectSetString(0, name, OBJPROP_FONT, "Arial");
-   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 10);
-   ObjectSetInteger(0, name, OBJPROP_COLOR, text_color);
-   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-}
-
-string ContextName(const int context)
-{
-   if(context == CONTEXT_BULLISH)
-      return "bullish";
-   if(context == CONTEXT_BEARISH)
-      return "bearish";
-   return "neutral";
+      DrawContextLabel("Bearish Context", InpBearishColor);
+   else
+      DrawContextLabel("Neutral Context", InpContextColor);
 }
 
 int GetTimeframeContext(const ENUM_TIMEFRAMES timeframe)
 {
    MqlRates rates[];
    ArraySetAsSeries(rates, true);
-   int copied = CopyRates(_Symbol, timeframe, 0, 120, rates);
-   if(copied < 40)
+   int copied = CopyRates(_Symbol, timeframe, 0, 140, rates);
+   if(copied < 50)
       return CONTEXT_NEUTRAL;
 
    double previous_high = 0.0;
    double last_high = 0.0;
    double previous_low = 0.0;
    double last_low = 0.0;
-   int lookback = 2;
+   int confirm = 2;
 
-   for(int i = copied - lookback - 1; i >= lookback; --i)
+   for(int i = copied - confirm - 1; i >= confirm + 1; --i)
    {
-      if(IsRateSwingHigh(rates, copied, i, lookback))
+      if(IsRateSwingHigh(rates, copied, i, confirm))
       {
          previous_high = last_high;
          last_high = rates[i].high;
       }
-      if(IsRateSwingLow(rates, copied, i, lookback))
+
+      if(IsRateSwingLow(rates, copied, i, confirm))
       {
          previous_low = last_low;
          last_low = rates[i].low;
@@ -626,12 +653,12 @@ int GetTimeframeContext(const ENUM_TIMEFRAMES timeframe)
    return CONTEXT_NEUTRAL;
 }
 
-bool IsRateSwingHigh(const MqlRates &rates[], const int total, const int index, const int lookback)
+bool IsRateSwingHigh(const MqlRates &rates[], const int total, const int index, const int confirm)
 {
-   if(index < lookback || index + lookback >= total)
+   if(index <= confirm || index + confirm >= total)
       return false;
 
-   for(int offset = 1; offset <= lookback; ++offset)
+   for(int offset = 1; offset <= confirm; ++offset)
    {
       if(rates[index].high <= rates[index - offset].high)
          return false;
@@ -641,12 +668,12 @@ bool IsRateSwingHigh(const MqlRates &rates[], const int total, const int index, 
    return true;
 }
 
-bool IsRateSwingLow(const MqlRates &rates[], const int total, const int index, const int lookback)
+bool IsRateSwingLow(const MqlRates &rates[], const int total, const int index, const int confirm)
 {
-   if(index < lookback || index + lookback >= total)
+   if(index <= confirm || index + confirm >= total)
       return false;
 
-   for(int offset = 1; offset <= lookback; ++offset)
+   for(int offset = 1; offset <= confirm; ++offset)
    {
       if(rates[index].low >= rates[index - offset].low)
          return false;
@@ -654,4 +681,107 @@ bool IsRateSwingLow(const MqlRates &rates[], const int total, const int index, c
          return false;
    }
    return true;
+}
+
+void UpsertRectangle(const string name,
+                     const datetime left_time,
+                     const double upper_price,
+                     const datetime right_time,
+                     const double lower_price,
+                     const color rectangle_color,
+                     const bool fill,
+                     const bool back,
+                     const ENUM_LINE_STYLE style,
+                     const int width)
+{
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_RECTANGLE, 0, left_time, upper_price, right_time, lower_price);
+   else
+   {
+      ObjectMove(0, name, 0, left_time, upper_price);
+      ObjectMove(0, name, 1, right_time, lower_price);
+   }
+
+   ObjectSetInteger(0, name, OBJPROP_COLOR, TransparentColor(rectangle_color));
+   ObjectSetInteger(0, name, OBJPROP_FILL, fill);
+   ObjectSetInteger(0, name, OBJPROP_BACK, back);
+   ObjectSetInteger(0, name, OBJPROP_STYLE, style);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH, width);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
+
+void DrawTextObject(const string suffix,
+                    const datetime object_time,
+                    const double price,
+                    const string text,
+                    const color text_color,
+                    const int font_size,
+                    const ENUM_ANCHOR_POINT anchor)
+{
+   string name = g_prefix + suffix;
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_TEXT, 0, object_time, price);
+   else
+      ObjectMove(0, name, 0, object_time, price);
+
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, font_size);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, text_color);
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR, anchor);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
+
+void DrawTrendLine(const string suffix,
+                   const datetime first_time,
+                   const double first_price,
+                   const datetime second_time,
+                   const double second_price,
+                   const color line_color)
+{
+   string name = g_prefix + suffix;
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_TREND, 0, first_time, first_price, second_time, second_price);
+   else
+   {
+      ObjectMove(0, name, 0, first_time, first_price);
+      ObjectMove(0, name, 1, second_time, second_price);
+   }
+
+   ObjectSetInteger(0, name, OBJPROP_COLOR, line_color);
+   ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
+
+void DrawContextLabel(const string text, const color text_color)
+{
+   string name = g_prefix + "CONTEXT_LABEL";
+   if(ObjectFind(0, name) < 0)
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+
+   ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, 12);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, 18);
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 10);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, text_color);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
+
+string TimeframeName(const ENUM_TIMEFRAMES timeframe)
+{
+   switch(timeframe)
+   {
+      case PERIOD_M1:  return "M1";
+      case PERIOD_M5:  return "M5";
+      case PERIOD_M15: return "M15";
+      case PERIOD_M30: return "M30";
+      case PERIOD_H1:  return "H1";
+      case PERIOD_H4:  return "H4";
+      case PERIOD_D1:  return "D1";
+      default:         return IntegerToString((int)timeframe);
+   }
 }
