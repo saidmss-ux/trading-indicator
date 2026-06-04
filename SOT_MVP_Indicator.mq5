@@ -1,6 +1,6 @@
-#property copyright "SOT TDSS"
+#property copyright "TDSS v2"
 #property link      ""
-#property version   "3.00"
+#property version   "2.00"
 #property strict
 #property indicator_chart_window
 #property indicator_plots 0
@@ -48,7 +48,8 @@ input color  InpCompressionColor        = clrSlateGray;
 input color  InpImportantColor          = clrGold;
 input color  InpPanelColor              = clrWhite;
 
-#define TDSS_PREFIX "SOT_TDSS_"
+#define TDSS_PREFIX "TDSS_V2_"
+#define TDSS_LEGACY_PREFIX "SOT_TDSS_"
 #define TF_COUNT 5
 #define SWING_HIGH_TYPE 1
 #define SWING_LOW_TYPE -1
@@ -111,8 +112,25 @@ struct CandleMark
    color    mark_color;
 };
 
+struct StructureLineObservation
+{
+   bool     valid;
+   bool     support_line;
+   bool     broken;
+   datetime first_time;
+   double   first_price;
+   datetime second_time;
+   double   second_price;
+   datetime break_time;
+   double   break_price;
+   string   tooltip;
+   string   break_label;
+   string   break_tooltip;
+};
+
 string          g_prefix = "";
 datetime        g_last_closed_bar_time = 0;
+datetime        g_last_tf_closed_bar_time[TF_COUNT];
 ENUM_TIMEFRAMES g_timeframes[TF_COUNT];
 string          g_tf_names[TF_COUNT];
 int             g_tf_weights[TF_COUNT];
@@ -126,6 +144,7 @@ int             g_context_states[TF_COUNT];
 int OnInit()
 {
    g_prefix = TDSS_PREFIX + IntegerToString((int)ChartID()) + "_";
+   DeleteObjectsByPrefix(TDSS_LEGACY_PREFIX + IntegerToString((int)ChartID()) + "_");
    ConfigureTimeframes();
 
    for(int i = 0; i < TF_COUNT; ++i)
@@ -137,9 +156,10 @@ int OnInit()
       ResetZone(g_resistance_zones[i]);
       ResetCompression(g_compressions[i]);
       g_context_states[i] = CONTEXT_FLAT;
+      g_last_tf_closed_bar_time[i] = 0;
    }
 
-   IndicatorSetString(INDICATOR_SHORTNAME, "SOT TDSS Visual Market Structure");
+   IndicatorSetString(INDICATOR_SHORTNAME, "TDSS v2 Market Observation");
    DrawDashboard();
    return INIT_SUCCEEDED;
 }
@@ -229,41 +249,88 @@ void ProcessTimeframe(const int tf_index)
 {
    MqlRates rates[];
    double atr[];
+   int copied_rates = 0;
+   int scan_limit = 0;
+
+   if(!LoadTimeframeMarketData(tf_index, rates, atr, copied_rates, scan_limit))
+      return;
+
+   SwingPoint swings[];
+   CandleMark candle_marks[];
+   StructureLineObservation structure_lines[];
+   ArrayResize(swings, 0);
+   ArrayResize(candle_marks, 0);
+   ArrayResize(structure_lines, 0);
+
+   AnalyzeMarketTimeframe(tf_index, rates, copied_rates, scan_limit, atr, swings, candle_marks, structure_lines);
+   RenderTimeframeObservations(tf_index, atr, swings, candle_marks, structure_lines);
+}
+
+// MARKET ANALYSIS LAYER
+bool LoadTimeframeMarketData(const int tf_index,
+                             MqlRates &rates[],
+                             double &atr[],
+                             int &copied_rates,
+                             int &scan_limit)
+{
    ArraySetAsSeries(rates, true);
    ArraySetAsSeries(atr, true);
 
    int bars_needed = MathMax(InpBarsPerTimeframe, RequiredBars());
-   int copied_rates = CopyRates(_Symbol, g_timeframes[tf_index], 0, bars_needed, rates);
+   copied_rates = CopyRates(_Symbol, g_timeframes[tf_index], 0, bars_needed, rates);
    if(copied_rates < RequiredBars())
-      return;
+      return false;
 
    int copied_atr = CopyBuffer(g_atr_handles[tf_index], 0, 0, copied_rates, atr);
    if(copied_atr < RequiredBars())
-      return;
+      return false;
 
-   int scan_limit = MathMin(copied_rates - InpSwingConfirmBars - 2, InpBarsPerTimeframe - InpSwingConfirmBars - 2);
+   scan_limit = MathMin(copied_rates - InpSwingConfirmBars - 2, InpBarsPerTimeframe - InpSwingConfirmBars - 2);
    if(scan_limit <= InpSwingConfirmBars + 2)
-      return;
+      return false;
 
-   SwingPoint swings[];
-   ArrayResize(swings, 0);
+   g_last_tf_closed_bar_time[tf_index] = rates[1].time;
+   return true;
+}
+
+void AnalyzeMarketTimeframe(const int tf_index,
+                            const MqlRates &rates[],
+                            const int copied_rates,
+                            const int scan_limit,
+                            const double &atr[],
+                            SwingPoint &swings[],
+                            CandleMark &candle_marks[],
+                            StructureLineObservation &structure_lines[])
+{
    BuildSwings(tf_index, rates, copied_rates, scan_limit, atr, swings);
    g_context_states[tf_index] = ClassifyStructureContext(swings);
 
+   BuildLatestZones(tf_index, rates, copied_rates, scan_limit, atr, g_support_zones[tf_index], g_resistance_zones[tf_index]);
+   DetectCompression(tf_index, rates, copied_rates, scan_limit, atr, g_compressions[tf_index]);
+   BuildStructureLineObservations(tf_index, swings, rates, structure_lines);
+
+   if(tf_index <= 2)
+      BuildImportantCandles(tf_index, rates, copied_rates, scan_limit, atr, candle_marks);
+}
+
+// RENDERING LAYER
+void RenderTimeframeObservations(const int tf_index,
+                                 const double &atr[],
+                                 const SwingPoint &swings[],
+                                 const CandleMark &candle_marks[],
+                                 const StructureLineObservation &structure_lines[])
+{
    if(InpShowStructureLabels)
       DrawStructure(tf_index, swings, atr);
 
-   BuildLatestZones(tf_index, rates, copied_rates, scan_limit, atr, g_support_zones[tf_index], g_resistance_zones[tf_index]);
-
    if(InpShowStructureLines)
-      DrawDynamicStructureLines(tf_index, swings, rates);
+      RenderStructureLines(tf_index, structure_lines);
 
-   DetectCompression(tf_index, rates, copied_rates, scan_limit, atr, g_compressions[tf_index]);
    if(InpShowCompression)
       DrawCompression(g_compressions[tf_index]);
 
    if(InpShowCandles && tf_index <= 2)
-      DrawImportantCandles(tf_index, rates, copied_rates, scan_limit, atr);
+      RenderImportantCandles(tf_index, candle_marks);
 }
 
 void BuildSwings(const int tf_index,
@@ -373,6 +440,7 @@ int ClassifyStructureContext(const SwingPoint &swings[])
    return CONTEXT_FLAT;
 }
 
+// SCORING LAYER
 int ScoreStructurePoint(const int tf_index, const SwingPoint &swing, const double atr_value, const double previous_price)
 {
    int score = 40 + g_tf_weights[tf_index];
@@ -605,6 +673,7 @@ int ScoreCompression(const CompressionInfo &compression, const int small_body_co
    return ClampScore(score);
 }
 
+// RENDERING LAYER DETAILS
 void DrawStructure(const int tf_index, const SwingPoint &swings[], const double &atr[])
 {
    int total = ArraySize(swings);
@@ -621,8 +690,14 @@ void DrawStructure(const int tf_index, const SwingPoint &swings[], const double 
    }
 }
 
-void DrawDynamicStructureLines(const int tf_index, const SwingPoint &swings[], const MqlRates &rates[])
+// MARKET ANALYSIS LAYER - STRUCTURE LINE OBSERVATIONS
+void BuildStructureLineObservations(const int tf_index,
+                                    const SwingPoint &swings[],
+                                    const MqlRates &rates[],
+                                    StructureLineObservation &structure_lines[])
 {
+   ArrayResize(structure_lines, 0);
+
    SwingPoint first_low;
    SwingPoint second_low;
    SwingPoint first_high;
@@ -665,25 +740,43 @@ void DrawDynamicStructureLines(const int tf_index, const SwingPoint &swings[], c
 
    if(have_first_low && have_second_low)
    {
-      string tooltip = "Dynamic support context " + g_tf_names[tf_index] + " from recent low structure";
-      DrawTrend("DYN_SUP_" + g_tf_names[tf_index], second_low.time, second_low.price, first_low.time, first_low.price, g_tf_colors[tf_index], STYLE_SOLID, tooltip);
-      MarkLineBreak(tf_index, "DYN_SUP_BRK_", second_low, first_low, rates, true);
+      StructureLineObservation line;
+      BuildStructureLineObservation(tf_index, second_low, first_low, rates, true, line);
+      AppendStructureLineObservation(structure_lines, line);
    }
 
    if(have_first_high && have_second_high)
    {
-      string tooltip = "Dynamic resistance context " + g_tf_names[tf_index] + " from recent high structure";
-      DrawTrend("DYN_RES_" + g_tf_names[tf_index], second_high.time, second_high.price, first_high.time, first_high.price, g_tf_colors[tf_index], STYLE_DASH, tooltip);
-      MarkLineBreak(tf_index, "DYN_RES_BRK_", second_high, first_high, rates, false);
+      StructureLineObservation line;
+      BuildStructureLineObservation(tf_index, second_high, first_high, rates, false, line);
+      AppendStructureLineObservation(structure_lines, line);
    }
 }
 
-void MarkLineBreak(const int tf_index,
-                   const string prefix,
-                   const SwingPoint &older_point,
-                   const SwingPoint &newer_point,
-                   const MqlRates &rates[],
-                   const bool support_line)
+void BuildStructureLineObservation(const int tf_index,
+                                   const SwingPoint &older_point,
+                                   const SwingPoint &newer_point,
+                                   const MqlRates &rates[],
+                                   const bool support_line,
+                                   StructureLineObservation &line)
+{
+   ResetStructureLineObservation(line);
+   line.valid = true;
+   line.support_line = support_line;
+   line.first_time = older_point.time;
+   line.first_price = older_point.price;
+   line.second_time = newer_point.time;
+   line.second_price = newer_point.price;
+   line.tooltip = (support_line ? "Dynamic support context " : "Dynamic resistance context ") + g_tf_names[tf_index] + " from recent structure observation";
+   DetectStructureLineBreak(tf_index, older_point, newer_point, rates, support_line, line);
+}
+
+void DetectStructureLineBreak(const int tf_index,
+                              const SwingPoint &older_point,
+                              const SwingPoint &newer_point,
+                              const MqlRates &rates[],
+                              const bool support_line,
+                              StructureLineObservation &line)
 {
    double dt = (double)(newer_point.time - older_point.time);
    if(dt == 0.0)
@@ -696,13 +789,51 @@ void MarkLineBreak(const int tf_index,
       double projected = older_point.price + slope * (double)(rates[i].time - older_point.time);
       if(support_line && rates[i].close < projected)
       {
-         DrawText(prefix + g_tf_names[tf_index], rates[i].time, rates[i].close, "Structure change " + g_tf_names[tf_index], InpFlipColor, 8, ANCHOR_CENTER, "Dynamic support line broken | " + g_tf_names[tf_index]);
+         line.broken = true;
+         line.break_time = rates[i].time;
+         line.break_price = rates[i].close;
+         line.break_label = "Structure change " + g_tf_names[tf_index];
+         line.break_tooltip = "Dynamic support line observation changed | " + g_tf_names[tf_index];
          return;
       }
       if(!support_line && rates[i].close > projected)
       {
-         DrawText(prefix + g_tf_names[tf_index], rates[i].time, rates[i].close, "Structure change " + g_tf_names[tf_index], InpFlipColor, 8, ANCHOR_CENTER, "Dynamic resistance line broken | " + g_tf_names[tf_index]);
+         line.broken = true;
+         line.break_time = rates[i].time;
+         line.break_price = rates[i].close;
+         line.break_label = "Structure change " + g_tf_names[tf_index];
+         line.break_tooltip = "Dynamic resistance line observation changed | " + g_tf_names[tf_index];
          return;
+      }
+   }
+}
+
+void AppendStructureLineObservation(StructureLineObservation &structure_lines[], const StructureLineObservation &line)
+{
+   if(!line.valid)
+      return;
+
+   int size = ArraySize(structure_lines);
+   ArrayResize(structure_lines, size + 1);
+   structure_lines[size] = line;
+}
+
+// RENDERING LAYER DETAILS
+void RenderStructureLines(const int tf_index, const StructureLineObservation &structure_lines[])
+{
+   for(int i = 0; i < ArraySize(structure_lines); ++i)
+   {
+      StructureLineObservation line = structure_lines[i];
+      string suffix = (line.support_line ? "DYN_SUP_" : "DYN_RES_") + g_tf_names[tf_index];
+      ENUM_LINE_STYLE style = STYLE_SOLID;
+      if(!line.support_line)
+         style = STYLE_DASH;
+      DrawTrend(suffix, line.first_time, line.first_price, line.second_time, line.second_price, g_tf_colors[tf_index], style, line.tooltip);
+
+      if(line.broken)
+      {
+         string break_suffix = (line.support_line ? "DYN_SUP_BRK_" : "DYN_RES_BRK_") + g_tf_names[tf_index];
+         DrawText(break_suffix, line.break_time, line.break_price, line.break_label, InpFlipColor, 8, ANCHOR_CENTER, line.break_tooltip);
       }
    }
 }
@@ -749,12 +880,14 @@ void DrawCompression(const CompressionInfo &compression)
    DrawText(label_name, compression.start_time, (compression.upper + compression.lower) / 2.0, "Compression " + g_tf_names[tf_index] + " " + IntegerToString(compression.score), g_tf_colors[tf_index], 8, ANCHOR_CENTER, tooltip);
 }
 
-void DrawImportantCandles(const int tf_index,
+void BuildImportantCandles(const int tf_index,
                           const MqlRates &rates[],
                           const int total,
                           const int scan_limit,
-                          const double &atr[])
+                          const double &atr[],
+                          CandleMark &candle_marks[])
 {
+   ArrayResize(candle_marks, 0);
    int marks = 0;
    int limit = MathMin(scan_limit, 90);
    for(int i = 1; i <= limit && marks < InpImportantCandlesMax; ++i)
@@ -765,10 +898,26 @@ void DrawImportantCandles(const int tf_index,
       if(!mark.valid)
          continue;
 
+      AppendCandleMark(candle_marks, mark);
+      marks++;
+   }
+}
+
+void AppendCandleMark(CandleMark &candle_marks[], const CandleMark &mark)
+{
+   int size = ArraySize(candle_marks);
+   ArrayResize(candle_marks, size + 1);
+   candle_marks[size] = mark;
+}
+
+void RenderImportantCandles(const int tf_index, const CandleMark &candle_marks[])
+{
+   for(int i = 0; i < ArraySize(candle_marks); ++i)
+   {
+      CandleMark mark = candle_marks[i];
       string suffix = "CANDLE_" + g_tf_names[tf_index] + "_" + IntegerToString((int)mark.time);
       string text = mark.label + " " + g_tf_names[tf_index] + " " + IntegerToString(mark.score);
       DrawText(suffix, mark.time, mark.price, text, mark.mark_color, 8, ANCHOR_CENTER, mark.reason);
-      marks++;
    }
 }
 
@@ -964,6 +1113,7 @@ void ExpandConfluenceBounds(const ZoneInfo &base_zone, const ZoneInfo &candidate
    }
 }
 
+// CONTEXT LAYER
 void DrawDashboard()
 {
    if(!InpShowContextPanel)
@@ -971,7 +1121,7 @@ void DrawDashboard()
 
    int up_score = 0;
    int down_score = 0;
-   string rows = "SOT TDSS Context\n";
+   string rows = "TDSS v2 Context\n";
    for(int i = 0; i < TF_COUNT; ++i)
    {
       string state = "Neutral";
@@ -1002,7 +1152,7 @@ void DrawDashboard()
    }
 
    rows += "Context score: " + IntegerToString(MathMax(up_score, down_score)) + "\n";
-   rows += "Mode: visual ranking only";
+   rows += "Mode: market observation only";
    DrawPanel("DASHBOARD", 12, 18, headline + "\n" + rows, panel_color);
 }
 
@@ -1047,6 +1197,22 @@ void ResetCandleMark(CandleMark &mark)
    mark.label = "";
    mark.reason = "";
    mark.mark_color = InpImportantColor;
+}
+
+void ResetStructureLineObservation(StructureLineObservation &line)
+{
+   line.valid = false;
+   line.support_line = false;
+   line.broken = false;
+   line.first_time = 0;
+   line.first_price = 0.0;
+   line.second_time = 0;
+   line.second_price = 0.0;
+   line.break_time = 0;
+   line.break_price = 0.0;
+   line.tooltip = "";
+   line.break_label = "";
+   line.break_tooltip = "";
 }
 
 int ClampScore(const int value)
@@ -1181,7 +1347,7 @@ void DrawPanel(const string suffix, const int x, const int y, const string text,
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
    ObjectSetInteger(0, name, OBJPROP_COLOR, text_color);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-   ObjectSetString(0, name, OBJPROP_TOOLTIP, "Context panel | timeframe alignment | visual ranking only");
+   ObjectSetString(0, name, OBJPROP_TOOLTIP, "Context panel | timeframe observation | no trade recommendation");
 }
 
 void DeleteTransientObjects()
@@ -1198,7 +1364,11 @@ void DeleteTransientObjects()
 
 void DeleteObjectGroup(const string group_name)
 {
-   string object_prefix = g_prefix + group_name;
+   DeleteObjectsByPrefix(g_prefix + group_name);
+}
+
+void DeleteObjectsByPrefix(const string object_prefix)
+{
    int total = ObjectsTotal(0, 0, -1);
    for(int i = total - 1; i >= 0; --i)
    {
@@ -1210,11 +1380,5 @@ void DeleteObjectGroup(const string group_name)
 
 void DeleteAllTDSSObjects()
 {
-   int total = ObjectsTotal(0, 0, -1);
-   for(int i = total - 1; i >= 0; --i)
-   {
-      string name = ObjectName(0, i, 0, -1);
-      if(StringFind(name, g_prefix) == 0)
-         ObjectDelete(0, name);
-   }
+   DeleteObjectsByPrefix(g_prefix);
 }
