@@ -1,41 +1,74 @@
-# TDSS v2 Market Observation Indicator
+# TDSS v2.1 Market Observation Indicator
 
-## Project overview
+## Project Overview
 
-This repository is the DocuHub and implementation workspace for TDSS v2, a MetaTrader 5 market observation and contextualization indicator.
+This repository is the documentation hub and implementation workspace for TDSS v2.1, a MetaTrader 5 market observation and contextualization indicator.
 
-TDSS v2 is a Decision Support System. It observes, classifies, scores, visualizes, and explains market context. It does not generate signals, predictions, trade recommendations, entries, exits, targets, or stop-loss guidance. The trader remains the sole decision maker.
+TDSS v2.1 is a decision-support system. It observes, classifies, scores activity significance, visualizes, and explains market context. It does not generate signals, predictions, trade recommendations, entries, exits, targets, stop-loss guidance, probability of success, or expected outcome. The trader remains the sole decision maker.
 
 ## Current Phase
 
-Phase 1 establishes the TDSS v2 foundation:
+Current status: **Phase 2 started with a controlled zone-engine foundation**.
 
-- official TDSS v2 identity
-- SOT-aligned documentation
-- architectural separation between analysis, scoring, rendering, and context layers
-- stabilized HH / HL / LH / LL structure observation
-- reusable support and resistance zone foundation for future TDSS activity-zone models
+The current work establishes:
+
+- revised SOT v2.1 business truth
+- clarified retest philosophy
+- clarified Support / Resistance interpretation
+- clarified activity-significance scoring philosophy
+- simplicity principle
+- project-wide documentation standard
+- Phase 2 zone lifecycle foundation
+- neutral retest interaction tracking
+- activity-score v1 for visual priority
+- WHAT / WHY / IMPACT explainability for zones
+
+Phase 2 remains limited to observational zone handling. It does not add signal, prediction, automation, execution, or recommendation behavior.
+
+## Documentation Standard
+
+Each project document has a distinct role:
+
+| Document | Role |
+|---|---|
+| `SOT.md` | Business truth only. No implementation details. |
+| `ARCHITECTURE.md` | System architecture, modules, responsibilities, dependencies, and code documentation conventions. |
+| `DOMAIN_MODEL.md` | Business entities, relationships, and business rules. |
+| `IMPLEMENTATION_STATUS.md` | Current implementation state, completed features, pending features, known limitations, and readiness. |
+| `CHANGELOG.md` | Historical evolution, version history, and major decisions. |
+| `MIGRATION.md` | Legacy mapping and Keep / Refactor / Remove decisions. |
+| `AGENT.md` | Instructions for AI coding agents working in the repository. |
 
 ## Source of Truth
 
-`SOT.md` is the business source of truth. If implementation details conflict with the SOT, the SOT prevails.
+`SOT.md` is the business source of truth. If implementation details or other documents conflict with the SOT, the SOT prevails.
 
-## Folder structure
+## Folder Structure
 
 ```text
 .
-├── README.md               # Project overview and workflow
-├── SOT.md                  # TDSS v2 business source of truth
-├── ARCHITECTURE.md         # Layer responsibilities and dependencies
-├── MIGRATION.md            # Phase 1 migration decisions and future phases
-├── SOT_MVP_Indicator.mq5   # TDSS v2 MT5 indicator implementation; legacy filename retained for compatibility
-└── AGENT.md                # AI coding agent instructions
+├── README.md                   # Project overview and workflow
+├── SOT.md                      # TDSS v2.1 business source of truth
+├── ARCHITECTURE.md             # Architecture, responsibilities, dependencies, documentation conventions
+├── DOMAIN_MODEL.md             # Business entities, relationships, and rules
+├── IMPLEMENTATION_STATUS.md    # Implementation status, limitations, and readiness
+├── CHANGELOG.md                # Version history and major decisions
+├── MIGRATION.md                # Legacy mapping and migration decisions
+├── SOT_MVP_Indicator.mq5       # TDSS v2 MT5 indicator implementation; legacy filename retained for compatibility
+└── AGENT.md                    # AI coding agent instructions
 ```
 
-## Development workflow
+## Development Workflow
 
 1. Validate business rules in `SOT.md` before implementation.
-2. Keep changes limited to the active phase.
-3. Preserve existing behavior when it aligns with TDSS v2 neutrality.
-4. Keep documentation aligned with approved implementation changes.
-5. Verify that no output becomes a trade signal, prediction, or recommendation.
+2. Check `IMPLEMENTATION_STATUS.md` for current limitations and readiness.
+3. Keep changes limited to the approved phase.
+4. Preserve existing behavior only when it aligns with TDSS v2.1 neutrality.
+5. Keep documentation aligned with approved implementation changes.
+6. Verify that no output becomes a trade signal, prediction, expected outcome, probability statement, or recommendation.
+
+## Phase 2 Status
+
+Phase 2 has started in a controlled scope focused on support/resistance zone lifecycle, neutral retest semantics, activity scoring v1, explainability, and score-based visual hierarchy.
+
+The next recommended step is chart-level validation of zone persistence, score explanations, and neutral displayed terminology before expanding Phase 2.

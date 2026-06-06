@@ -1,6 +1,6 @@
 #property copyright "TDSS v2"
 #property link      ""
-#property version   "2.00"
+#property version   "2.10"
 #property strict
 #property indicator_chart_window
 #property indicator_plots 0
@@ -15,7 +15,7 @@ input int    InpCompressionBars         = 7;
 input double InpCompressionATRFactor    = 0.72;
 input double InpSmallBodyRatio          = 0.25;
 input double InpStrongBodyRatio         = 0.62;
-input double InpLongWickRatio           = 0.55;
+input double InpExtendedWickRatio       = 0.55;
 input int    InpImportantCandlesMax     = 18;
 input int    InpConfluenceDistancePts   = 250;
 input int    InpHighScoreThreshold      = 75;
@@ -30,7 +30,7 @@ input int    InpM5Weight                = 2;
 input int    InpM15Weight               = 4;
 input int    InpH1Weight                = 10;
 input int    InpH4Weight                = 20;
-input int    InpRetestScoreWeight       = 6;
+input int    InpInteractionScoreWeight  = 3;
 input int    InpConfluenceScoreWeight   = 8;
 input int    InpRecencyScoreWeight      = 12;
 input int    InpCandleBaseScore         = 45;
@@ -78,14 +78,32 @@ struct ZoneInfo
    int      timeframe_index;
    int      source_index;
    int      retests;
+   int      interaction_observations;
+   int      response_observations;
+   int      pressure_observations;
+   int      confluence_observations;
    int      score;
+   int      structural_score;
+   int      interaction_score;
+   int      freshness_score;
+   int      response_score;
+   int      pressure_adjustment;
+   int      confluence_score;
+   int      compression_score;
    double   upper;
    double   lower;
    double   midpoint;
    datetime start_time;
    datetime end_time;
    datetime break_time;
+   datetime last_interaction_time;
+   string   identity;
+   string   lifecycle_state;
    string   reason;
+   string   what;
+   string   why;
+   string   impact;
+   string   score_details;
 };
 
 struct CompressionInfo
@@ -145,6 +163,7 @@ int OnInit()
 {
    g_prefix = TDSS_PREFIX + IntegerToString((int)ChartID()) + "_";
    DeleteObjectsByPrefix(TDSS_LEGACY_PREFIX + IntegerToString((int)ChartID()) + "_");
+   DeleteObjectGroup("ZONE_FLIP_");
    ConfigureTimeframes();
 
    for(int i = 0; i < TF_COUNT; ++i)
@@ -159,7 +178,7 @@ int OnInit()
       g_last_tf_closed_bar_time[i] = 0;
    }
 
-   IndicatorSetString(INDICATOR_SHORTNAME, "TDSS v2 Market Observation");
+   IndicatorSetString(INDICATOR_SHORTNAME, "TDSS v2.1 Market Observation");
    DrawDashboard();
    return INIT_SUCCEEDED;
 }
@@ -456,6 +475,13 @@ int ScoreStructurePoint(const int tf_index, const SwingPoint &swing, const doubl
    return ClampScore(score);
 }
 
+// MODULE: Zone lifecycle and activity scoring v1
+// Purpose: Maintains observational Support / Resistance zones, neutral interaction evidence, lifecycle state, and activity-significance score details.
+// Dependencies: Confirmed swing observations, closed-candle market data, ATR values, timeframe context, compression observations, and nearby zone observations.
+// Inputs: Timeframe rates, ATR values, configured score weights, and existing persisted zone state.
+// Outputs: Stable zone state with WHAT / WHY / IMPACT explainability and score components used only for visual priority.
+// Business Notes: Retests are interaction evidence only. Score changes must not imply direction, certainty, recommendation, or expected outcome.
+// SOT References: SOT.md sections 4, 5, 8, 9, 11, 12, 13, and 14.
 void BuildLatestZones(const int tf_index,
                       const MqlRates &rates[],
                       const int total,
@@ -464,8 +490,11 @@ void BuildLatestZones(const int tf_index,
                       ZoneInfo &support_zone,
                       ZoneInfo &resistance_zone)
 {
-   ResetZone(support_zone);
-   ResetZone(resistance_zone);
+   ZoneInfo support_candidate;
+   ZoneInfo resistance_candidate;
+   ResetZone(support_candidate);
+   ResetZone(resistance_candidate);
+
    bool support_found = false;
    bool resistance_found = false;
 
@@ -473,21 +502,69 @@ void BuildLatestZones(const int tf_index,
    {
       if(!support_found && IsConfirmedSwingLow(rates, total, i))
       {
-         CreateZone(tf_index, ZONE_SUPPORT_TYPE, i, rates, rates[i].low, atr[i], support_zone);
-         EvaluateZoneBehavior(support_zone, rates, atr);
+         CreateZone(tf_index, ZONE_SUPPORT_TYPE, i, rates, rates[i].low, atr[i], support_candidate);
          support_found = true;
       }
 
       if(!resistance_found && IsConfirmedSwingHigh(rates, total, i))
       {
-         CreateZone(tf_index, ZONE_RESISTANCE_TYPE, i, rates, rates[i].high, atr[i], resistance_zone);
-         EvaluateZoneBehavior(resistance_zone, rates, atr);
+         CreateZone(tf_index, ZONE_RESISTANCE_TYPE, i, rates, rates[i].high, atr[i], resistance_candidate);
          resistance_found = true;
       }
 
       if(support_found && resistance_found)
          break;
    }
+
+   ReconcileZoneLifecycle(support_zone, support_candidate, rates, atr);
+   ReconcileZoneLifecycle(resistance_zone, resistance_candidate, rates, atr);
+}
+
+void ReconcileZoneLifecycle(ZoneInfo &existing_zone,
+                            const ZoneInfo &candidate_zone,
+                            const MqlRates &rates[],
+                            const double &atr[])
+{
+   if(!candidate_zone.valid)
+   {
+      if(existing_zone.valid)
+         EvaluateZoneBehavior(existing_zone, rates, atr);
+      return;
+   }
+
+   if(!existing_zone.valid || existing_zone.broken || !IsSameZoneObservation(existing_zone, candidate_zone))
+      CopyZone(candidate_zone, existing_zone);
+   else
+      UpdatePersistedZone(existing_zone, candidate_zone);
+
+   EvaluateZoneBehavior(existing_zone, rates, atr);
+}
+
+bool IsSameZoneObservation(const ZoneInfo &existing_zone, const ZoneInfo &candidate_zone)
+{
+   if(!existing_zone.valid || !candidate_zone.valid)
+      return false;
+   if(existing_zone.zone_type != candidate_zone.zone_type || existing_zone.timeframe_index != candidate_zone.timeframe_index)
+      return false;
+
+   double tolerance = MathMax((existing_zone.upper - existing_zone.lower), _Point * 20.0);
+   return MathAbs(existing_zone.midpoint - candidate_zone.midpoint) <= tolerance;
+}
+
+void CopyZone(const ZoneInfo &source_zone, ZoneInfo &target_zone)
+{
+   target_zone = source_zone;
+}
+
+void UpdatePersistedZone(ZoneInfo &existing_zone, const ZoneInfo &candidate_zone)
+{
+   existing_zone.source_index = candidate_zone.source_index;
+   existing_zone.upper = (existing_zone.upper + candidate_zone.upper) / 2.0;
+   existing_zone.lower = (existing_zone.lower + candidate_zone.lower) / 2.0;
+   existing_zone.midpoint = (existing_zone.upper + existing_zone.lower) / 2.0;
+   existing_zone.end_time = 0;
+   existing_zone.reason = ZoneName(existing_zone.zone_type) + " " + g_tf_names[existing_zone.timeframe_index] + " from persisted confirmed swing area";
+   existing_zone.why = "WHY: derived from a confirmed swing and maintained because the refreshed observation remains near the same area.";
 }
 
 void CreateZone(const int tf_index,
@@ -506,14 +583,32 @@ void CreateZone(const int tf_index,
    zone.timeframe_index = tf_index;
    zone.source_index = source_index;
    zone.retests = 0;
+   zone.interaction_observations = 0;
+   zone.response_observations = 0;
+   zone.pressure_observations = 0;
+   zone.confluence_observations = 0;
    zone.score = 0;
+   zone.structural_score = 0;
+   zone.interaction_score = 0;
+   zone.freshness_score = 0;
+   zone.response_score = 0;
+   zone.pressure_adjustment = 0;
+   zone.confluence_score = 0;
+   zone.compression_score = 0;
    zone.upper = midpoint + width;
    zone.lower = midpoint - width;
    zone.midpoint = midpoint;
    zone.start_time = rates[source_index].time;
    zone.end_time = 0;
    zone.break_time = 0;
+   zone.last_interaction_time = 0;
+   zone.identity = g_tf_names[tf_index] + "_" + ZoneName(zone_type) + "_" + IntegerToString((int)zone.start_time);
+   zone.lifecycle_state = "Active observation";
    zone.reason = ZoneName(zone_type) + " " + g_tf_names[tf_index] + " from confirmed swing";
+   zone.what = "WHAT: " + ZoneName(zone_type) + " observation zone on " + g_tf_names[tf_index] + ".";
+   zone.why = "WHY: derived from a confirmed swing area where participant activity was observed.";
+   zone.impact = "IMPACT: marks an area that may deserve chart-reading attention; it does not imply direction or a decision.";
+   zone.score_details = "Score pending activity assessment.";
 }
 
 void EvaluateZoneBehavior(ZoneInfo &zone, const MqlRates &rates[], const double &atr[])
@@ -521,12 +616,30 @@ void EvaluateZoneBehavior(ZoneInfo &zone, const MqlRates &rates[], const double 
    if(!zone.valid)
       return;
 
+   zone.broken = false;
+   zone.flipped = false;
+   zone.retests = 0;
+   zone.interaction_observations = 0;
+   zone.response_observations = 0;
+   zone.pressure_observations = 0;
+   zone.last_interaction_time = 0;
+   zone.lifecycle_state = "Active observation";
+   zone.end_time = 0;
+   zone.break_time = 0;
+
    double break_buffer = MathMax(atr[zone.source_index] * InpZoneATRBuffer, _Point * 20.0);
+   bool in_touch_sequence = false;
+
    for(int i = zone.source_index - 1; i >= 1; --i)
    {
       bool touched = (rates[i].high >= zone.lower && rates[i].low <= zone.upper);
-      if(touched)
-         zone.retests++;
+      if(touched && !in_touch_sequence)
+      {
+         RegisterZoneInteraction(zone, rates, atr, i);
+         in_touch_sequence = true;
+      }
+      else if(!touched)
+         in_touch_sequence = false;
 
       if(zone.zone_type == ZONE_SUPPORT_TYPE && rates[i].close < zone.lower - break_buffer)
       {
@@ -534,7 +647,8 @@ void EvaluateZoneBehavior(ZoneInfo &zone, const MqlRates &rates[], const double 
          zone.flipped = true;
          zone.break_time = rates[i].time;
          zone.end_time = rates[i].time;
-         zone.reason = zone.reason + "; clean break; flipped context";
+         zone.lifecycle_state = "Inactive after observed break";
+         zone.reason = ZoneName(zone.zone_type) + " " + g_tf_names[zone.timeframe_index] + " from confirmed swing; observed break changed lifecycle state";
          return;
       }
 
@@ -544,10 +658,43 @@ void EvaluateZoneBehavior(ZoneInfo &zone, const MqlRates &rates[], const double 
          zone.flipped = true;
          zone.break_time = rates[i].time;
          zone.end_time = rates[i].time;
-         zone.reason = zone.reason + "; clean break; flipped context";
+         zone.lifecycle_state = "Inactive after observed break";
+         zone.reason = ZoneName(zone.zone_type) + " " + g_tf_names[zone.timeframe_index] + " from confirmed swing; observed break changed lifecycle state";
          return;
       }
    }
+
+   if(zone.pressure_observations > zone.response_observations && zone.interaction_observations > 0)
+      zone.lifecycle_state = "Active with pressure observations";
+   else if(zone.response_observations > 0)
+      zone.lifecycle_state = "Active with response observations";
+}
+
+void RegisterZoneInteraction(ZoneInfo &zone, const MqlRates &rates[], const double &atr[], const int index)
+{
+   zone.retests++;
+   zone.interaction_observations++;
+   zone.last_interaction_time = rates[index].time;
+
+   double response_buffer = MathMax(atr[index] * 0.20, _Point * 20.0);
+   bool response_observed = false;
+   bool pressure_observed = false;
+
+   if(zone.zone_type == ZONE_SUPPORT_TYPE)
+   {
+      response_observed = (rates[index].close > zone.upper + response_buffer);
+      pressure_observed = (rates[index].close <= zone.midpoint);
+   }
+   else if(zone.zone_type == ZONE_RESISTANCE_TYPE)
+   {
+      response_observed = (rates[index].close < zone.lower - response_buffer);
+      pressure_observed = (rates[index].close >= zone.midpoint);
+   }
+
+   if(response_observed)
+      zone.response_observations++;
+   else if(pressure_observed)
+      zone.pressure_observations++;
 }
 
 void ScoreZone(ZoneInfo &zone)
@@ -555,13 +702,48 @@ void ScoreZone(ZoneInfo &zone)
    if(!zone.valid)
       return;
 
-   int score = 35 + g_tf_weights[zone.timeframe_index];
-   score += MathMin(24, zone.retests * InpRetestScoreWeight);
-   score += MathMax(0, InpRecencyScoreWeight - zone.source_index / 10);
-   score += CountZoneConfluence(zone) * InpConfluenceScoreWeight;
-   if(zone.flipped)
-      score -= 10;
+   zone.structural_score = 35 + g_tf_weights[zone.timeframe_index];
+   zone.interaction_score = MathMin(12, zone.interaction_observations * InpInteractionScoreWeight);
+   zone.freshness_score = MathMax(0, InpRecencyScoreWeight - zone.source_index / 10);
+   zone.response_score = MathMin(18, zone.response_observations * 6);
+   zone.pressure_adjustment = MathMin(18, zone.pressure_observations * 5);
+   zone.confluence_observations = CountZoneConfluence(zone);
+   zone.confluence_score = zone.confluence_observations * InpConfluenceScoreWeight;
+   zone.compression_score = IsZoneNearCompression(zone) ? 8 : 0;
+
+   int score = zone.structural_score;
+   score += zone.interaction_score;
+   score += zone.freshness_score;
+   score += zone.response_score;
+   score += zone.confluence_score;
+   score += zone.compression_score;
+   score -= zone.pressure_adjustment;
+   if(zone.broken)
+      score -= 20;
+
    zone.score = ClampScore(score);
+   zone.score_details = "Score detail: structure " + IntegerToString(zone.structural_score) +
+                        ", interaction " + IntegerToString(zone.interaction_score) +
+                        ", freshness " + IntegerToString(zone.freshness_score) +
+                        ", response " + IntegerToString(zone.response_score) +
+                        ", pressure adjustment -" + IntegerToString(zone.pressure_adjustment) +
+                        ", confluence " + IntegerToString(zone.confluence_score) +
+                        ", compression " + IntegerToString(zone.compression_score) + ".";
+   zone.impact = "IMPACT: score controls visual priority for chart reading only; it does not describe future direction, certainty, or a decision.";
+}
+
+bool IsZoneNearCompression(const ZoneInfo &zone)
+{
+   if(!zone.valid)
+      return false;
+
+   double tolerance = InpConfluenceDistancePts * _Point;
+   for(int i = 0; i < TF_COUNT; ++i)
+   {
+      if(g_compressions[i].valid && zone.upper >= g_compressions[i].lower - tolerance && zone.lower <= g_compressions[i].upper + tolerance)
+         return true;
+   }
+   return false;
 }
 
 int CountZoneConfluence(const ZoneInfo &zone)
@@ -842,24 +1024,40 @@ void DrawZone(const int tf_index, const string slot, const ZoneInfo &zone)
 {
    string object_name = g_prefix + "ZONE_" + g_tf_names[tf_index] + "_" + slot;
    string label_name = "ZONE_LABEL_" + g_tf_names[tf_index] + "_" + slot;
+   string lifecycle_label_name = "ZONE_STATE_" + g_tf_names[tf_index] + "_" + slot;
 
    if(!zone.valid)
    {
       ObjectDelete(0, object_name);
       ObjectDelete(0, g_prefix + label_name);
+      ObjectDelete(0, g_prefix + lifecycle_label_name);
       return;
    }
 
    datetime right_time = zone.broken ? zone.end_time : TimeCurrent() + (datetime)(PeriodSeconds(g_timeframes[tf_index]) * InpZoneExtendBars);
    color zone_color = zone.flipped ? InpFlipColor : ((zone.zone_type == ZONE_SUPPORT_TYPE) ? InpSupportColor : InpResistanceColor);
-   string tooltip = zone.reason + " | Score " + IntegerToString(zone.score) + " | Retests " + IntegerToString(zone.retests);
-   UpsertRectangle(object_name, zone.start_time, zone.upper, right_time, zone.lower, BlendTimeframeColor(zone_color, g_tf_colors[tf_index]), true, true, STYLE_SOLID, ZoneWidthByScore(zone.score), tooltip);
+   string tooltip = BuildZoneTooltip(zone);
+   UpsertRectangle(object_name, zone.start_time, zone.upper, right_time, zone.lower, BlendTimeframeColor(zone_color, g_tf_colors[tf_index]), true, true, ZoneStyleByScore(zone.score), ZoneWidthByScore(zone.score), tooltip);
 
-   string text = ZoneName(zone.zone_type) + " " + g_tf_names[tf_index] + " " + IntegerToString(zone.score);
+   string text = ZoneName(zone.zone_type) + " " + g_tf_names[tf_index] + " activity " + IntegerToString(zone.score);
    DrawText(label_name, zone.start_time, zone.midpoint, text, g_tf_colors[tf_index], 8, ANCHOR_CENTER, tooltip);
 
    if(zone.broken)
-      DrawText("ZONE_FLIP_" + g_tf_names[tf_index] + "_" + slot, zone.break_time, zone.midpoint, "Flip " + g_tf_names[tf_index] + " " + IntegerToString(zone.score), InpFlipColor, 8, ANCHOR_CENTER, tooltip);
+      DrawText(lifecycle_label_name, zone.break_time, zone.midpoint, "State change " + g_tf_names[tf_index] + " " + IntegerToString(zone.score), InpFlipColor, 8, ANCHOR_CENTER, tooltip);
+   else
+      ObjectDelete(0, g_prefix + lifecycle_label_name);
+}
+
+string BuildZoneTooltip(const ZoneInfo &zone)
+{
+   return zone.what + "\n" +
+          zone.why + "\n" +
+          zone.impact + "\n" +
+          "Lifecycle: " + zone.lifecycle_state + ".\n" +
+          "Interactions: " + IntegerToString(zone.interaction_observations) +
+          "; response observations: " + IntegerToString(zone.response_observations) +
+          "; pressure observations: " + IntegerToString(zone.pressure_observations) + ".\n" +
+          zone.score_details;
 }
 
 void DrawCompression(const CompressionInfo &compression)
@@ -941,14 +1139,14 @@ void AnalyzeCandle(const int tf_index,
    double lower_wick_ratio = (MathMin(rates[index].open, rates[index].close) - rates[index].low) / range;
    double wick_body_ratio = MathMax(upper_wick_ratio, lower_wick_ratio) / MathMax(body_ratio, 0.05);
 
-   bool rejection = (upper_wick_ratio >= InpLongWickRatio || lower_wick_ratio >= InpLongWickRatio);
+   bool rejection = (upper_wick_ratio >= InpExtendedWickRatio || lower_wick_ratio >= InpExtendedWickRatio);
    bool strong_impulse = (body_ratio >= InpStrongBodyRatio && range >= atr[index] * 0.80);
    bool small_body = (body_ratio <= InpSmallBodyRatio && HasDirectionalPush(index, rates));
    bool tightening = IsTightening(index, rates);
    bool slowdown = IsMomentumSlowdown(index, rates);
-   bool pre_break = tightening && IsNearRelevantArea(rates[index].close, atr[index] * 0.5);
+   bool nearby_tightening = tightening && IsNearRelevantArea(rates[index].close, atr[index] * 0.5);
 
-   if(!rejection && !strong_impulse && !small_body && !tightening && !slowdown && !pre_break)
+   if(!rejection && !strong_impulse && !small_body && !tightening && !slowdown && !nearby_tightening)
       return;
 
    int score = InpCandleBaseScore + g_tf_weights[tf_index];
@@ -984,11 +1182,11 @@ void AnalyzeCandle(const int tf_index,
       label = "Slowdown";
       reason += "momentum slowdown";
    }
-   else if(pre_break)
+   else if(nearby_tightening)
    {
       score += 12;
-      label = "Pre-break";
-      reason += "tightening near active zone";
+      label = "Tightening near zone";
+      reason += "range contraction near observed zone";
    }
    else if(tightening)
    {
@@ -1095,9 +1293,9 @@ void DrawZoneConfluence(int &group_id, const ZoneInfo &base_zone)
    string name = g_prefix + "CONFLUENCE_" + IntegerToString(group_id);
    string label = "CONFLUENCE_LABEL_" + IntegerToString(group_id);
    datetime right_time = TimeCurrent() + (datetime)(PeriodSeconds(_Period) * InpZoneExtendBars);
-   string tooltip = "High confluence area | Score " + IntegerToString(base_zone.score) + " | Overlaps " + IntegerToString(confluence_count);
+   string tooltip = "Confluence observation | Activity score " + IntegerToString(base_zone.score) + " | Overlapping observations " + IntegerToString(confluence_count) + " | visual priority only";
    UpsertRectangle(name, TimeCurrent() - (datetime)(PeriodSeconds(_Period) * 20), upper, right_time, lower, InpImportantColor, true, true, STYLE_DASHDOT, 2, tooltip);
-   DrawText(label, TimeCurrent(), (upper + lower) / 2.0, "Confluence " + IntegerToString(base_zone.score), InpImportantColor, 8, ANCHOR_CENTER, tooltip);
+   DrawText(label, TimeCurrent(), (upper + lower) / 2.0, "Confluence observation " + IntegerToString(base_zone.score), InpImportantColor, 8, ANCHOR_CENTER, tooltip);
    group_id++;
 }
 
@@ -1165,14 +1363,32 @@ void ResetZone(ZoneInfo &zone)
    zone.timeframe_index = 0;
    zone.source_index = -1;
    zone.retests = 0;
+   zone.interaction_observations = 0;
+   zone.response_observations = 0;
+   zone.pressure_observations = 0;
+   zone.confluence_observations = 0;
    zone.score = 0;
+   zone.structural_score = 0;
+   zone.interaction_score = 0;
+   zone.freshness_score = 0;
+   zone.response_score = 0;
+   zone.pressure_adjustment = 0;
+   zone.confluence_score = 0;
+   zone.compression_score = 0;
    zone.upper = 0.0;
    zone.lower = 0.0;
    zone.midpoint = 0.0;
    zone.start_time = 0;
    zone.end_time = 0;
    zone.break_time = 0;
+   zone.last_interaction_time = 0;
+   zone.identity = "";
+   zone.lifecycle_state = "";
    zone.reason = "";
+   zone.what = "";
+   zone.why = "";
+   zone.impact = "";
+   zone.score_details = "";
 }
 
 void ResetCompression(CompressionInfo &compression)
@@ -1227,6 +1443,15 @@ int ZoneWidthByScore(const int score)
    if(score >= InpHighScoreThreshold)
       return 2;
    return 1;
+}
+
+ENUM_LINE_STYLE ZoneStyleByScore(const int score)
+{
+   if(score >= InpHighScoreThreshold)
+      return STYLE_SOLID;
+   if(score >= 45)
+      return STYLE_DASH;
+   return STYLE_DOT;
 }
 
 string ZoneName(const int zone_type)
@@ -1347,7 +1572,7 @@ void DrawPanel(const string suffix, const int x, const int y, const string text,
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
    ObjectSetInteger(0, name, OBJPROP_COLOR, text_color);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-   ObjectSetString(0, name, OBJPROP_TOOLTIP, "Context panel | timeframe observation | no trade recommendation");
+   ObjectSetString(0, name, OBJPROP_TOOLTIP, "Context panel | timeframe observation | no action instruction");
 }
 
 void DeleteTransientObjects()
