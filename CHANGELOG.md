@@ -8,6 +8,25 @@ Business truth remains in `SOT.md`.
 
 ## Version History
 
+### TDSS v2.1 Phase 2 Start — Zone Engine Foundation
+
+Date: 2026-06-06
+
+Major decisions:
+
+- Began Phase 2 with a controlled implementation focused only on observational support/resistance zone lifecycle.
+- Added persisted zone lifecycle reconciliation to reduce unnecessary recreation across recalculations.
+- Reworked retest handling so retests are neutral interaction observations, separated from response and pressure observations.
+- Added activity-score v1 components for structure, interaction visibility, freshness, response observations, pressure adjustment, confluence observation, and compression proximity.
+- Added WHAT / WHY / IMPACT explainability for visible zones.
+- Used score for visual hierarchy only through line style and width.
+- Avoided HPZ, advanced confluence, participant inference, prediction, automation, and recommendation behavior.
+
+Implementation note:
+
+- Indicator logic changed only inside the Phase 2 zone-engine scope.
+- Existing non-zone primitives were preserved where SOT-aligned.
+
 ### TDSS v2.1 — SOT Refresh and Documentation Standardization
 
 Date: 2026-06-06

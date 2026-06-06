@@ -148,7 +148,9 @@ The current implementation is contained in `SOT_MVP_Indicator.mq5`. It is organi
 | Swing classification | Market Analysis | Build confirmed HH / HL / LH / LL observations. |
 | Structure context classification | Market Analysis / Context | Classify observed structure context as bullish, bearish, or neutral. |
 | Zone foundation | Market Analysis | Build support and resistance observation zones from confirmed swings. |
-| Zone behavior evaluation | Market Analysis | Record touches, breaks, and flipped context as observations. |
+| Zone lifecycle engine | Market Analysis / Scoring | Reconcile persisted zones, track neutral interactions, classify response and pressure observations, and maintain lifecycle state. |
+| Zone behavior evaluation | Market Analysis | Record interactions, observed breaks, and changed lifecycle context as observations. |
+| Activity scoring v1 | Scoring | Decompose zone score into structural, interaction, freshness, response, pressure, confluence-observation, and compression-proximity components. |
 | Compression detection | Market Analysis | Identify range contraction and observed expansion. |
 | Candle observation detection | Market Analysis | Mark selected candle observations near relevant areas. |
 | Score functions | Scoring | Produce bounded activity-significance values. |
@@ -217,6 +219,15 @@ Any code change that changes business behavior, module responsibility, displayed
 - Logical separation of analysis, scoring, rendering, and context responsibilities.
 - Stabilized structure observation from closed candles.
 - Reusable support/resistance zone foundation.
+
+### Phase 2 Started Scope
+
+- Persisted support/resistance zone lifecycle reconciliation.
+- Neutral interaction tracking for retests.
+- Response and pressure observations separated from retest count.
+- Activity-score v1 with decomposed score details.
+- WHAT / WHY / IMPACT explainability for visible zones.
+- Score-based visual hierarchy for chart priority only.
 
 ### Out of Scope Until Explicitly Approved
 

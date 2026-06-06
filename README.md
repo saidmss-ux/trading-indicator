@@ -8,7 +8,7 @@ TDSS v2.1 is a decision-support system. It observes, classifies, scores activity
 
 ## Current Phase
 
-Current status: **SOT v2.1 refresh and documentation standardization completed; Phase 2 is not ready**.
+Current status: **Phase 2 started with a controlled zone-engine foundation**.
 
 The current work establishes:
 
@@ -18,9 +18,12 @@ The current work establishes:
 - clarified activity-significance scoring philosophy
 - simplicity principle
 - project-wide documentation standard
-- Phase 2 readiness review
+- Phase 2 zone lifecycle foundation
+- neutral retest interaction tracking
+- activity-score v1 for visual priority
+- WHAT / WHY / IMPACT explainability for zones
 
-No new features were implemented and no scoring logic was modified as part of the v2.1 documentation refresh.
+Phase 2 remains limited to observational zone handling. It does not add signal, prediction, automation, execution, or recommendation behavior.
 
 ## Documentation Standard
 
@@ -64,8 +67,8 @@ Each project document has a distinct role:
 5. Keep documentation aligned with approved implementation changes.
 6. Verify that no output becomes a trade signal, prediction, expected outcome, probability statement, or recommendation.
 
-## Phase 2 Readiness
+## Phase 2 Status
 
-Phase 2 is currently **not ready**.
+Phase 2 has started in a controlled scope focused on support/resistance zone lifecycle, neutral retest semantics, activity scoring v1, explainability, and score-based visual hierarchy.
 
-Before Phase 2 coding begins, the project must resolve retest-scoring alignment, audit displayed terminology, add code documentation headers where needed, and document the approved Phase 2 scope.
+The next recommended step is chart-level validation of zone persistence, score explanations, and neutral displayed terminology before expanding Phase 2.

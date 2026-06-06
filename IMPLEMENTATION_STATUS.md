@@ -8,9 +8,9 @@ It is a status document only. Business truth remains in `SOT.md`.
 
 ## Current Status
 
-Status: **Foundation implemented; Phase 2 not ready**.
+Status: **Phase 2 started; controlled zone-engine foundation implemented**.
 
-The repository contains a MetaTrader 5 indicator implementation in `SOT_MVP_Indicator.mq5` and a refreshed TDSS v2.1 documentation set.
+The repository contains a MetaTrader 5 indicator implementation in `SOT_MVP_Indicator.mq5`, a refreshed TDSS v2.1 documentation set, and a Phase 2 zone-engine foundation.
 
 ## Completed Features
 
@@ -41,32 +41,35 @@ The repository contains a MetaTrader 5 indicator implementation in `SOT_MVP_Indi
 - Candle observation markers are present on lower timeframes.
 - Confluence-area rendering is present.
 - Activity-significance score display is present.
+- Phase 2 zone lifecycle reconciliation is present for support and resistance observations.
+- Retest tracking is represented as neutral interaction evidence rather than automatic strengthening.
+- Zone scoring now exposes decomposed activity-score components.
+- Visible zones include WHAT / WHY / IMPACT explainability in tooltips.
+- Zone visual hierarchy uses score for display priority only.
 - Chart object creation and cleanup helpers are present.
 
 ## Pending Features / Work Items
 
-These items must not begin until Phase 2 is explicitly approved:
+These items remain after the Phase 2 start:
 
-- Align implementation scoring details with TDSS v2.1 retest philosophy.
-- Review displayed terminology for complete TDSS v2.1 neutrality.
-- Add standardized module headers to implementation sections.
-- Add standardized function-level documentation for SOT-sensitive functions.
-- Review score explanations/tooltips so they clearly describe activity significance only.
-- Define Phase 2 scope before coding.
+- Validate the activity-score v1 formula against real chart behavior while preserving neutrality.
+- Continue reviewing displayed terminology for complete TDSS v2.1 neutrality.
+- Add standardized documentation headers to additional non-zone implementation sections.
 - Decide whether HPZ or advanced activity-zone concepts remain needed after applying the simplicity principle.
 - Review whether current timeframe weights should remain implementation settings or be reinterpreted.
+- Consider whether the single-file implementation should be split after the zone engine stabilizes.
 
 ## Known Limitations
 
 ### Retest Scoring Alignment
 
-The current implementation contains retest-count-based score contribution. TDSS v2.1 clarifies that a retest is interaction evidence only and must not automatically imply strengthening or weakening.
+Phase 2 activity scoring now separates neutral interaction observations from response observations and pressure observations. Retest count no longer acts as an automatic zone-strength multiplier.
 
-No scoring logic was changed during the SOT v2.1 refresh. Before Phase 2 implementation, the team must decide how to align retest scoring and explanation with the updated SOT.
+Further validation is still needed to confirm that score weighting remains useful for visual priority without implying future direction or expected outcome.
 
 ### Documentation Headers in Code
 
-The architecture now defines module and function documentation conventions. The current code has section labels, but it has not yet been fully updated to the new documentation-header standard.
+The zone lifecycle and activity-scoring section now includes a standard module header. Other implementation sections still have lighter section labels and should be documented incrementally.
 
 ### Single-File Implementation
 
@@ -74,11 +77,11 @@ The current indicator is implemented in one MQL5 file. This keeps deployment sim
 
 ### Terminology Review Needed
 
-The current implementation appears broadly neutral, but all labels, tooltips, and names should be reviewed against TDSS v2.1 before Phase 2 coding.
+The current implementation appears broadly neutral, but all labels, tooltips, and names should continue to be reviewed against TDSS v2.1 as Phase 2 proceeds.
 
-### Phase 2 Scope Undefined
+### Phase 2 Scope
 
-Phase 2 implementation scope is not yet documented in an approved plan.
+The Phase 2 start is limited to support/resistance zone lifecycle, neutral retest semantics, activity scoring v1, explainability, and score-based visual hierarchy.
 
 ## Architectural Risks
 
@@ -88,24 +91,24 @@ Phase 2 implementation scope is not yet documented in an approved plan.
 - Confluence and high-score rendering may be misunderstood as probability unless neutral language is enforced.
 - Future advanced models could violate the simplicity principle if accepted without clear chart-reading value.
 
-## Phase 2 Readiness Review
+## Phase 2 Start Review
 
-Decision: **NOT READY**.
+Decision: **READY FOR CONTROLLED VALIDATION**.
 
 Justification:
 
-1. Retest scoring interpretation needs alignment with TDSS v2.1.
-2. Code documentation has not yet been standardized according to the new convention.
-3. Phase 2 scope and acceptance criteria are not yet documented.
-4. Current labels/tooltips require a neutrality audit before new implementation begins.
-5. Architectural risk remains around single-file growth and scoring-language drift.
+1. Retest scoring philosophy has been translated into neutral interaction, response, and pressure observations.
+2. Phase 2 scope has been limited to zone lifecycle, activity scoring v1, explainability, and visual hierarchy.
+3. The implementation preserves the observation-only model and avoids signal, prediction, and recommendation behavior.
+4. Zone-engine code now has explicit SOT-oriented module documentation.
+5. Remaining risks are documented and should be validated before expanding Phase 2 scope.
 
-## Readiness Criteria for Phase 2
+## Validation Criteria for Continuing Phase 2
 
-TDSS can be considered ready for Phase 2 only after:
+TDSS should continue Phase 2 only if:
 
-- Retest scoring philosophy is translated into implementation requirements.
-- Phase 2 scope is documented and approved.
-- All existing displayed terminology is audited against `SOT.md`.
-- Module documentation headers are added where needed.
-- Known architectural risks are accepted or mitigated.
+- Zone persistence behaves reliably on live chart refreshes.
+- Activity scores remain understandable and decomposable.
+- Retest explanations remain neutral and observational.
+- Multi-timeframe zones remain visible without suppression.
+- No label or tooltip implies prediction, recommendation, or trading intent.

@@ -21,13 +21,13 @@ This is not a greenfield rewrite. Existing behavior may be retained only when it
 | HH / HL / LH / LL swing logic | KEEP | Aligns with structure observation using confirmed closed-candle swings. |
 | Structure context summary | REFACTOR | Retained as neutral context; wording must avoid recommendations and directional forecasts. |
 | Support / Resistance zones | REFACTOR | Retained as observational participant-activity areas only. They must not be treated as buy/sell, target, stop, hold, or break predictions. |
-| Retest counting | REFACTOR | Retests are interaction evidence only. Count alone must not imply zone strength or weakness. |
+| Retest counting | REFACTORED IN PHASE 2 START | Retests are tracked as neutral interaction evidence and separated from response and pressure observations. Count alone does not imply zone strength or weakness. |
 | Zone break / flip observations | REFACTOR | Retained as observed state changes only; must not imply continuation, reversal, entry, or exit. |
 | Compression observation | KEEP | Retained as non-directional range/volatility observation. |
 | Expansion observation | KEEP | Retained as observed release/range expansion only; must not imply breakout direction or continuation. |
 | Candle observations | KEEP | Retained as visual observations near relevant areas; no recommendation semantics. |
 | Confluence rendering | REFACTOR | Retained as activity-overlap context; must not imply probability of success. |
-| Local scoring functions | REFACTOR | Retained as activity-significance scoring only; retest contribution needs TDSS v2.1 alignment before Phase 2. |
+| Local scoring functions | REFACTORED IN PHASE 2 START | Zone activity-score v1 is decomposed and used for visual priority only. |
 | Rendering helpers | KEEP | Reusable chart-object layer. Rendering must not create business meaning. |
 | Context panel | REFACTOR | Retained as neutral context display. Must preserve observation-only language. |
 | Signal-generation concepts from legacy SOT | REMOVE | Incompatible with TDSS v2.1 neutrality. |
@@ -67,13 +67,13 @@ Active documentation removes or prohibits legacy signal language such as:
 - confluence-area rendering
 - chart object cleanup
 
-## Refactor Priorities Before Phase 2
+## Refactor Priorities After Phase 2 Start
 
-1. Align retest scoring and explanation with TDSS v2.1 retest philosophy.
-2. Audit displayed wording and tooltips for neutrality.
-3. Add module and function documentation headers for maintainability.
-4. Define Phase 2 scope and acceptance criteria.
-5. Decide whether single-file implementation remains acceptable or requires modularization.
+1. Validate zone persistence and lifecycle behavior during live chart refreshes.
+2. Continue auditing displayed wording and tooltips for neutrality.
+3. Add module and function documentation headers beyond the zone engine.
+4. Decide whether single-file implementation remains acceptable or requires modularization.
+5. Avoid expanding into HPZ or advanced models until activity-score v1 is validated.
 
 ## Future Phase Candidates
 
