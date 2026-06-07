@@ -8,6 +8,39 @@ Business truth remains in `SOT.md`.
 
 ## Version History
 
+### TDSS v2.1 — Operating Model Alignment
+
+Date: 2026-06-07
+
+Major decisions:
+
+- Formalized the TDSS operating model as Observation → Detection → Comparison → Display.
+- Reaffirmed that the chart is the product and the score is only a display hierarchy tool.
+- Simplified Phase 2 zone terminology from interpretive follow-up wording to close-away and inside-zone close observations.
+- Replaced narrative zone language with concise Observation / Detection / Display text.
+- Confirmed that no new feature, HPZ model, behavioral model, predictive model, or scoring system is approved by this alignment.
+
+Implementation note:
+
+- Renamed Phase 2 zone fields and displayed text to use close-away and inside-zone close wording.
+- Scoring formula behavior remains unchanged; score meaning is restricted to display priority.
+
+### TDSS v2.1 — Market Observation Re-Centering
+
+Date: 2026-06-06
+
+Major decisions:
+
+- Re-centered TDSS business documentation on the chart-first principle: TDSS maps visible chart behavior only.
+- Clarified that TDSS does not model participant psychology, participant intent, dominance, exhaustion, trapped participants, defense capacity, or who is winning.
+- Classified Phase 2 follow-up terminology as observable close-away and inside-zone close facts, not behavioral conclusions.
+- Reaffirmed that scores are display priority only, not strength, weakness, probability, expected outcome, or behavioral explanation.
+- Confirmed that no HPZ, behavioral model, new scoring system, predictive model, or scope expansion is approved by this re-centering.
+
+Implementation note:
+
+- Documentation only. No indicator logic was changed.
+
 ### TDSS v2.1 Phase 2 Start — Zone Engine Foundation
 
 Date: 2026-06-06
@@ -16,9 +49,9 @@ Major decisions:
 
 - Began Phase 2 with a controlled implementation focused only on observational support/resistance zone lifecycle.
 - Added persisted zone lifecycle reconciliation to reduce unnecessary recreation across recalculations.
-- Reworked retest handling so retests are neutral interaction observations, separated from response and pressure observations.
-- Added activity-score v1 components for structure, interaction visibility, freshness, response observations, pressure adjustment, confluence observation, and compression proximity.
-- Added WHAT / WHY / IMPACT explainability for visible zones.
+- Reworked retest handling so retests are neutral interaction observations, separated from close-away and inside-zone close observations.
+- Added display-priority score v1 components for structure, interaction visibility, freshness, close-away observations, inside-zone close adjustment, confluence observation, and compression proximity.
+- Added concise zone display text for visible zones.
 - Used score for visual hierarchy only through line style and width.
 - Avoided HPZ, advanced confluence, participant inference, prediction, automation, and recommendation behavior.
 
@@ -75,7 +108,7 @@ Major decisions:
 | TDSS is observation-only | Active | Preserves trader decision ownership. |
 | SOT governs business logic | Active | Prevents implementation drift. |
 | Support/Resistance are observational | Active | Avoids prediction and recommendation semantics. |
-| Scores measure activity significance only | Active | Prevents score misuse as trade-quality or probability measure. |
+| Scores are display-priority only | Active | Prevents score misuse as trade-quality, probability, behavioral, or outcome measure. |
 | Retests are interaction evidence only | Active in SOT v2.1 | Prevents unsupported strength/weakness assumptions. |
 | Simplicity is a design constraint | Active in SOT v2.1 | Keeps the project practical for chart reading. |
-| Phase 2 is not ready | Active | Alignment and documentation work remains before coding. |
+| Phase 2 is ready only for controlled validation | Active | Operating-model alignment and chart-level validation must continue before scope expansion. |

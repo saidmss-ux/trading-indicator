@@ -8,9 +8,17 @@ It is a status document only. Business truth remains in `SOT.md`.
 
 ## Current Status
 
-Status: **Phase 2 started; controlled zone-engine foundation implemented**.
+Status: **Phase 2 started; controlled zone-engine foundation implemented; operating model aligned to Observation → Detection → Comparison → Display**.
 
 The repository contains a MetaTrader 5 indicator implementation in `SOT_MVP_Indicator.mq5`, a refreshed TDSS v2.1 documentation set, and a Phase 2 zone-engine foundation.
+
+## Operating Model Alignment Audit
+
+Decision: **PASS**.
+
+The implementation now fits the four allowed categories: Observation, Detection, Comparison, and Display. Phase 2 stores visible zone facts, detects chart events, compares observable inputs, and uses score only as display priority. Former interpretive follow-up wording has been simplified in the implementation to close-away and inside-zone close observations.
+
+No new feature, HPZ model, behavioral model, or scoring system is approved by this audit.
 
 ## Completed Features
 
@@ -42,9 +50,9 @@ The repository contains a MetaTrader 5 indicator implementation in `SOT_MVP_Indi
 - Confluence-area rendering is present.
 - Activity-significance score display is present.
 - Phase 2 zone lifecycle reconciliation is present for support and resistance observations.
-- Retest tracking is represented as neutral interaction evidence rather than automatic strengthening.
-- Zone scoring now exposes decomposed activity-score components.
-- Visible zones include WHAT / WHY / IMPACT explainability in tooltips.
+- Retest tracking is represented as neutral interaction evidence rather than automatic strengthening or weakening.
+- Zone scoring now exposes decomposed display-priority inputs based on observable chart facts.
+- Visible zones use concise Observation / Detection / Display tooltip text.
 - Zone visual hierarchy uses score for display priority only.
 - Chart object creation and cleanup helpers are present.
 
@@ -52,8 +60,8 @@ The repository contains a MetaTrader 5 indicator implementation in `SOT_MVP_Indi
 
 These items remain after the Phase 2 start:
 
-- Validate the activity-score v1 formula against real chart behavior while preserving neutrality.
-- Continue reviewing displayed terminology for complete TDSS v2.1 neutrality.
+- Validate display-priority weights against chart readability while preserving neutrality and operating-model wording.
+- Continue reviewing displayed terminology for complete TDSS v2.1 neutrality and concise chart-fact wording.
 - Add standardized documentation headers to additional non-zone implementation sections.
 - Decide whether HPZ or advanced activity-zone concepts remain needed after applying the simplicity principle.
 - Review whether current timeframe weights should remain implementation settings or be reinterpreted.
@@ -61,11 +69,11 @@ These items remain after the Phase 2 start:
 
 ## Known Limitations
 
-### Retest Scoring Alignment
+### Score Display-Priority Alignment
 
-Phase 2 activity scoring now separates neutral interaction observations from response observations and pressure observations. Retest count no longer acts as an automatic zone-strength multiplier.
+Phase 2 scoring now separates neutral interaction observations from close-away and inside-zone close observations. Retest count no longer acts as an automatic zone-strength multiplier.
 
-Further validation is still needed to confirm that score weighting remains useful for visual priority without implying future direction or expected outcome.
+Further validation is still needed to confirm that score weighting improves chart readability without implying strength, weakness, probability, future direction, or expected outcome.
 
 ### Documentation Headers in Code
 
@@ -81,14 +89,14 @@ The current implementation appears broadly neutral, but all labels, tooltips, an
 
 ### Phase 2 Scope
 
-The Phase 2 start is limited to support/resistance zone lifecycle, neutral retest semantics, activity scoring v1, explainability, and score-based visual hierarchy.
+The Phase 2 start is limited to support/resistance zone lifecycle, neutral retest semantics, activity scoring v1 as display priority, concise chart-fact tooltips, and score-based visual hierarchy.
 
 ## Architectural Risks
 
-- Scoring and explanation can drift into recommendation semantics if not documented carefully.
-- Retest count may be misinterpreted by users as zone strength unless the UI and documentation frame it neutrally.
+- Scoring and labels can drift into recommendation semantics or market conclusions if not kept as display-priority facts.
+- Retest count may be misinterpreted by users as zone strength or weakness unless the UI and documentation frame it neutrally.
 - A single-file implementation may become difficult for humans and AI agents to modify safely.
-- Confluence and high-score rendering may be misunderstood as probability unless neutral language is enforced.
+- Confluence and high-score rendering may be misunderstood as probability or quality unless neutral display-priority language is enforced.
 - Future advanced models could violate the simplicity principle if accepted without clear chart-reading value.
 
 ## Phase 2 Start Review
@@ -97,8 +105,8 @@ Decision: **READY FOR CONTROLLED VALIDATION**.
 
 Justification:
 
-1. Retest scoring philosophy has been translated into neutral interaction, response, and pressure observations.
-2. Phase 2 scope has been limited to zone lifecycle, activity scoring v1, explainability, and visual hierarchy.
+1. Retest scoring philosophy has been translated into neutral interaction observations plus observable close-away and inside-zone close facts.
+2. Phase 2 scope has been limited to zone lifecycle, activity scoring v1 as display priority, concise chart-fact text, and visual hierarchy.
 3. The implementation preserves the observation-only model and avoids signal, prediction, and recommendation behavior.
 4. Zone-engine code now has explicit SOT-oriented module documentation.
 5. Remaining risks are documented and should be validated before expanding Phase 2 scope.
@@ -108,7 +116,7 @@ Justification:
 TDSS should continue Phase 2 only if:
 
 - Zone persistence behaves reliably on live chart refreshes.
-- Activity scores remain understandable and decomposable.
-- Retest explanations remain neutral and observational.
+- Activity scores remain display-priority-only and decomposable.
+- Retest labels remain neutral, factual, and free of narrative interpretation.
 - Multi-timeframe zones remain visible without suppression.
-- No label or tooltip implies prediction, recommendation, or trading intent.
+- No label or tooltip implies prediction, recommendation, trading intent, dominance, exhaustion, defense capacity, or who is winning.

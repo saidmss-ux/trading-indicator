@@ -9,10 +9,14 @@ Use `SOT.md` as the only source of business logic. If implementation details or 
 - Never invent trading rules.
 - Never add prediction logic.
 - Never add recommendation logic.
+- Keep all logic in exactly one of four categories: OBSERVATION, DETECTION, COMPARISON, or DISPLAY.
+- Never add participant-psychology, participant-intent, dominance, exhaustion, trapped-participant, defense-capacity, or who-is-winning logic.
 - Never describe outputs as entries, exits, targets, stop losses, trade setups, trade opportunities, probability of success, or expected outcome.
-- Treat Support and Resistance as observational constructs only.
+- Treat Support and Resistance as visible chart-observation constructs only.
 - Treat retests as interaction evidence only; do not assume that more retests automatically mean stronger or weaker zones.
 - Preserve trader decision ownership in all wording.
+- Prefer chart-fact wording such as “price interacted,” “close location observed,” or “distance moved after interaction” over behavioral wording such as “defended,” “weakened,” “dominant,” or “exhausted.”
+- Treat score wording as DISPLAY only: higher score means more visible, not better, stronger, weaker, or more probable.
 
 ## Implementation Rules
 
