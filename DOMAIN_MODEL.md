@@ -2,17 +2,18 @@
 
 ## Purpose
 
-This document defines TDSS v2.1 business entities, relationships, and rules in implementation-neutral language.
+This document defines TDSS v2.1 business entities, relationships, and rules through the operating model: Observation, Detection, Comparison, and Display.
 
 Business truth remains governed by `SOT.md`. This document explains the domain vocabulary used by humans, maintainers, and AI coding agents.
 
 ## Domain Principles
 
-- Every entity is observational.
+- Every entity must fit OBSERVATION, DETECTION, COMPARISON, or DISPLAY.
 - No entity is a trade instruction.
 - No relationship predicts future direction.
-- Scores represent activity significance only.
-- Retests represent interaction only unless additional context is documented.
+- No entity infers participant psychology, intent, dominance, exhaustion, trapped positioning, defense capacity, or who is winning.
+- Scores are display-priority values only.
+- Retests represent interaction only; additional fields must describe observable chart facts, not participant motives.
 - Simplicity is preferred over exhaustive market modeling.
 
 ## Entities
@@ -72,23 +73,23 @@ Rules:
 
 ### Support Zone
 
-An observational area where support-like participant activity has been observed.
+An observational area where support-like chart interaction has been observed.
 
 Rules:
 
 - A support zone is not a buy area.
 - A support zone is not proof price will hold.
-- A support zone may be relevant for chart review because participant activity was observed there.
+- A support zone may be relevant for chart review because visible chart interaction was observed there.
 
 ### Resistance Zone
 
-An observational area where resistance-like participant activity has been observed.
+An observational area where resistance-like chart interaction has been observed.
 
 Rules:
 
 - A resistance zone is not a sell area.
 - A resistance zone is not proof price will reject.
-- A resistance zone may be relevant for chart review because participant activity was observed there.
+- A resistance zone may be relevant for chart review because visible chart interaction was observed there.
 
 ### Retest
 
@@ -96,10 +97,10 @@ A repeated interaction between price and an observed area.
 
 Rules:
 
-- A retest is evidence of market interaction.
+- A retest is evidence of visible chart interaction.
 - A retest is not automatically strengthening.
 - A retest is not automatically weakening.
-- Retest significance depends on context and market response.
+- Retest significance depends on visible follow-up movement and surrounding chart context.
 - Retest count alone must not be treated as a prediction or outcome measure.
 
 ### Break
@@ -124,13 +125,13 @@ Rules:
 
 ### Compression Observation
 
-A period of reduced range, volatility contraction, or constrained price movement.
+A visible period of reduced range, volatility contraction, or constrained price movement.
 
 Rules:
 
 - Compression does not imply direction.
-- Compression may be relevant because participant activity appears constrained.
-- Compression must not be explained as a guaranteed breakout setup.
+- Compression may be relevant because price range appears constrained on the chart.
+- Compression must not be described as a guaranteed breakout setup.
 
 ### Expansion Observation
 
@@ -157,19 +158,19 @@ An area where multiple observations overlap or appear near each other.
 
 Rules:
 
-- Confluence may increase activity significance.
+- Confluence may increase visible chart display relevance.
 - Confluence does not imply probability of success.
 - Confluence does not imply future direction.
 
-### Activity-Significance Score
+### Display-Priority Score
 
-A bounded display value that prioritizes observations by neutral relevance.
+A bounded display value that controls visual hierarchy only.
 
 Rules:
 
-- Scores measure significance, activity, interaction, confluence, recency, or contextual relevance.
-- Scores do not measure profit probability, trade quality, expected direction, or expected outcome.
-- Scores are chart-reading aids only.
+- Scores use observable inputs such as age, interaction count, overlap count, timeframe weight, compression proximity, structural relevance, break / flip state, close location, or distance moved after interaction.
+- Scores do not measure strength, weakness, probability, trade quality, expected direction, expected outcome, participant intent, dominance, exhaustion, defense capacity, or who is winning.
+- Scores are display-ranking aids only; higher means more visible, not better.
 
 ### Visual Element
 
@@ -177,8 +178,34 @@ A label, line, rectangle, panel, or other chart object displayed by TDSS.
 
 Rules:
 
-- Every visual element must be explainable through WHAT, WHY, and IMPACT.
-- Visual elements must not use prohibited signal language.
+- Every visual element must display concise Observation, Detection, Comparison, or Display facts.
+- Visual elements must not use prohibited signal language or narrative market-storytelling language.
+
+## Feature Classification
+
+| Concept | Operating category | Required interpretation |
+|---|---|---|
+| Price data, levels, ranges, ATR-sized zone width | OBSERVATION | Facts visible or derived mechanically from chart data. |
+| HH / HL / LH / LL swings | DETECTION | Confirmed structure events detected from closed candles. |
+| Support / Resistance zones | DETECTION | Zones detected from confirmed swing areas. |
+| Zone age / freshness | COMPARISON | Newer or older source observations compared by chart index. |
+| Interaction count / retest count | OBSERVATION / COMPARISON | Price range overlapped the zone; counts can be compared, not interpreted as strength or weakness. |
+| Close-away count | OBSERVATION / COMPARISON | Close moved away from the zone by threshold; chart fact only. |
+| Inside-zone close count | OBSERVATION / COMPARISON | Close remained inside/deep in the zone by threshold; chart fact only. |
+| Confluence / overlap count | COMPARISON | Other timeframe zones are nearby; not probability. |
+| Compression proximity | DETECTION / COMPARISON | Zone overlaps or sits near a detected compression range. |
+| Break / flip state | DETECTION | Close moved beyond a zone threshold; not continuation or reversal expectation. |
+| Display-priority score | DISPLAY | Visual hierarchy only; higher means more visible. |
+| Rectangles, labels, line width, opacity, context panel | DISPLAY | Readability aids only. |
+
+## Concepts Outside the Operating Model
+
+| Concept | Classification | Required action |
+|---|---|---|
+| Defense capacity, dominance, exhaustion, trapped participants, conviction, who is winning | OUTSIDE MODEL | Remove from TDSS business logic; these belong only to trader interpretation. |
+| Likely breakout, probable failure, expected continuation | OUTSIDE MODEL / PREDICTIVE | Remove from TDSS outputs. |
+| Score as strength, weakness, quality, probability, or outcome | OUTSIDE MODEL | Replace with display-priority wording only. |
+| Long narrative labels or market storytelling | OUTSIDE MODEL | Simplify to Observation / Detection / Comparison / Display facts. |
 
 ## Relationships
 
@@ -189,8 +216,9 @@ Market Data
         → Zone Observations
         → Compression / Expansion Observations
         → Candle Observations
-            → Activity-Significance Scores
-                → Visual Elements
+            → Comparisons
+                → Display-Priority Scores
+                    → Visual Elements
                     → Trader Interpretation
 ```
 
@@ -204,12 +232,14 @@ Additional relationships:
 ## Business Rules Summary
 
 1. TDSS observes; the trader decides.
-2. Support and Resistance are participant-activity observations, not predictions.
+2. Support and Resistance are visible chart-interaction observations, not predictions.
 3. Retests are interactions, not automatic strength or weakness signals.
-4. Scores represent activity significance only.
+4. Scores represent display priority only.
 5. Context labels are descriptive only.
 6. Confluence increases relevance, not probability.
 7. Compression and expansion are non-directional observations.
-8. Every displayed element must remain explainable and neutral.
+8. Every displayed element must remain concise, factual, and neutral.
 9. Simplicity overrides speculative feature expansion.
 10. Any unclear business rule must be clarified in `SOT.md` before implementation.
+11. TDSS stores chart facts, not behavioral conclusions.
+12. Every feature must fit Observation, Detection, Comparison, or Display.

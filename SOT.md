@@ -2,28 +2,30 @@
 
 ## 1. Purpose
 
-TDSS v2.1 is a market observation and contextualization system.
+TDSS v2.1 is a chart observation and contextualization system.
 
-TDSS v2.1 exists to help a trader read a chart by organizing observable market information into a usable decision-support map.
+TDSS v2.1 exists to help a trader read a chart by organizing visible market structure, interactions, ranges, compression, expansion, and confluence into a usable decision-support map.
 
-TDSS v2.1 is not a signal generator, prediction engine, trade recommendation system, strategy engine, or automation framework. The trader remains the sole decision maker.
+TDSS v2.1 is not a signal generator, prediction engine, trade recommendation system, strategy engine, automation framework, participant-psychology model, intent model, dominance model, or outcome model. The trader remains the sole decision maker.
 
 ## 2. Core Neutrality Principle
 
-TDSS v2.1 may:
+TDSS v2.1 may operate only through four categories:
 
-- observe
-- classify
-- score activity significance
-- contextualize
-- visualize
-- explain
+- OBSERVATION: store facts directly visible on the chart
+- DETECTION: detect objective chart events from observations
+- COMPARISON: compare observable chart facts
+- DISPLAY: show observations, detections, comparisons, and display priority
 
 TDSS v2.1 may not:
 
 - recommend trades
 - predict future price
 - infer trader intent
+- infer participant psychology
+- infer participant intent
+- infer who is winning
+- infer exhaustion, conviction, dominance, trapped participants, defense capacity, or willingness to defend
 - suggest entries
 - suggest exits
 - suggest targets
@@ -34,25 +36,75 @@ TDSS v2.1 may not:
 
 Interpretation always belongs to the trader.
 
-## 3. Market Philosophy
+## 3. Chart-First Principle
 
-The market is viewed as a collection of participants holding, defending, exiting, entering, or adjusting positions. Price is considered a consequence of participant behavior.
+Every TDSS feature must be justified by a visible chart observation.
 
-TDSS v2.1 models observable participant activity areas rather than future price movement.
+Allowed TDSS concepts include:
 
-The objective is practical chart reading, not complete market-behavior simulation.
+- support zone observed
+- resistance zone observed
+- repeated interaction observed
+- price moved a measurable distance after interaction
+- close location relative to a zone
+- compression observed
+- expansion observed
+- confluence observed
+- structural break observed
+- HH / HL / LH / LL observed
 
-## 4. Support and Resistance Philosophy
+TDSS must not store, score, display, or describe:
+
+- buyers or sellers being exhausted
+- buyers or sellers being trapped
+- a defending group becoming weaker or stronger
+- participant conviction
+- resource consumption
+- dominance
+- participant intent
+- who is winning
+- expected outcome
+
+These concepts may exist in a trader's interpretation, but they must not exist in TDSS business logic.
+
+TDSS answers: “What is observable on the chart?”
+
+TDSS does not answer: “Why are participants doing this?” or “What will happen next?”
+
+## 4. Operating Model
+
+All TDSS logic must fit exactly one of these categories:
+
+| Category | Allowed purpose | Examples |
+|---|---|---|
+| OBSERVATION | Store facts directly visible on the chart. | price level, swing, HH / HL / LH / LL, support zone, resistance zone, zone width, zone age, interaction count, retest count, overlap count, compression duration, expansion occurrence, timeframe overlap, distance between zones. |
+| DETECTION | Detect objective and repeatable chart events from observations. | new support detected, new resistance detected, retest detected, compression detected, expansion detected, overlap detected, structure change detected, zone break detected, zone flip detected. |
+| COMPARISON | Compare observable chart facts without interpreting them. | older/newer, more/fewer interactions, longer/shorter compression, timeframe overlap, wider/narrower zone, closer/farther from current price. |
+| DISPLAY | Present observations, detections, comparisons, and visual priority. | rectangles, labels, score, opacity, line width, ranking, context panel. |
+
+Any concept, variable, score component, label, tooltip, or documentation text that does not fit OBSERVATION, DETECTION, COMPARISON, or DISPLAY must be simplified or removed.
+
+The chart is the product. The score is only a display hierarchy tool.
+
+## 5. Market Philosophy
+
+TDSS v2.1 is chart-first. It treats price, range, structure, compression, expansion, interactions, and confluence as observable chart facts.
+
+TDSS v2.1 maps what is visible on the chart. It does not model internal participant psychology, participant intent, dominance, exhaustion, trapped positioning, defense capacity, or who is winning.
+
+The objective is practical chart reading, not market-behavior simulation.
+
+## 6. Support and Resistance Philosophy
 
 Support and Resistance are observational constructs.
 
-They represent areas where participant activity has been observed. They are not predictions, trade recommendations, or claims that price will react in a particular way.
+They represent areas where visible chart interaction has been observed. They are not predictions, trade recommendations, or claims that price will react in a particular way.
 
 A Support or Resistance zone may describe:
 
 - observed historical interaction
-- potential participant attention
-- activity significance
+- repeated or visible chart attention
+- chart display relevance
 - confluence with other observations
 - a context area for human review
 
@@ -67,12 +119,12 @@ A Support or Resistance zone must not be interpreted by TDSS v2.1 as:
 - proof that price will hold
 - proof that price will break
 
-## 5. Activity vs Outcome
+## 7. Activity vs Outcome
 
 TDSS v2.1 measures:
 
 - significance
-- activity
+- visible activity
 - interaction
 - confluence
 - recency
@@ -83,19 +135,25 @@ TDSS v2.1 does not measure:
 - future direction
 - probability of success
 - expected outcome
+- buyer/seller exhaustion
+- trapped buyers or trapped sellers
+- participant conviction
+- participant dominance
+- defense capacity
+- who is winning
 - trade quality
 - recommendation strength
 - profit potential
 
 The system answers this question only:
 
-> How relevant is this observation as part of a market-activity map?
+> What is observable on the chart, and how visually relevant is this observation within the chart map?
 
 It does not answer:
 
 > What should the trader do next?
 
-## 6. Structure Model
+## 8. Structure Model
 
 Market structure is represented by:
 
@@ -114,13 +172,13 @@ Structure context labels may include:
 
 These labels describe observed structure only. They do not imply that future price should move in the labelled direction.
 
-## 7. Trend Context
+## 9. Trend Context
 
-Trend is a contextual observation. It may influence how a trader chooses to interpret other participant-activity observations, but TDSS v2.1 must not convert trend context into decisions, recommendations, directional forecasts, or trade outputs.
+Trend is a contextual observation. It may influence how a trader chooses to interpret other visible chart observations, but TDSS v2.1 must not convert trend context into decisions, recommendations, directional forecasts, or trade outputs.
 
 A trend label is descriptive, not prescriptive.
 
-## 8. Zones
+## 10. Zones
 
 Zones are bounded chart areas derived from observable market interaction.
 
@@ -128,7 +186,7 @@ A zone may be described as:
 
 - active or inactive
 - recently observed or older
-- more significant or less significant from an activity perspective
+- more or less visually prominent as chart facts
 - overlapping with other observations
 - interacted with by price
 - broken or flipped as an observed state change
@@ -143,40 +201,40 @@ A zone may not be described as:
 - a place to target
 - a place to protect risk
 
-## 9. Retest Philosophy
+## 11. Retest Philosophy
 
-A retest is evidence of market interaction.
+A retest is evidence of visible chart interaction.
 
 A retest is not automatically strengthening.
 
 A retest is not automatically weakening.
 
-The significance of a retest depends on context and market response. Retest count alone must not create assumptions such as:
+The significance of a retest depends on visible follow-up movement and surrounding chart context. Retest count alone must not create assumptions such as:
 
 - more retests equals a stronger zone
 - more retests equals a weaker zone
 - fewer retests equals a stronger zone
 - fewer retests equals a weaker zone
 
-A retest may contribute to an activity-significance assessment only when documented as an observation of interaction. Any stronger interpretation requires additional observable context, such as response quality, confluence, compression, expansion, rejection, absorption, or structural change.
+A retest may contribute to a display-priority assessment only when documented as an observation of interaction. Any further interpretation belongs to the trader. TDSS may record additional observable chart facts such as distance moved after interaction, confluence, compression, expansion, rejection-like wick shape, range contraction, or structural change, but it must not infer defense quality, absorption, conviction, exhaustion, dominance, or participant intent.
 
-TDSS v2.1 must preserve neutral language when explaining retests. The preferred interpretation is:
+TDSS v2.1 must preserve neutral language when displaying retests. The preferred wording is:
 
-> Price interacted with this area again; significance depends on the observed response and surrounding context.
+> Price interacted with this area again; TDSS records the visible follow-up movement and surrounding chart context without inferring intent or outcome.
 
-## 10. Compression and Expansion
+## 12. Compression and Expansion
 
-Compression represents reduced range, volatility contraction, or constrained price movement. Compression may indicate stored market pressure, but it does not imply direction.
+Compression represents reduced range, volatility contraction, or constrained price movement. Compression is a visible range condition; TDSS must not infer hidden force, participant intent, or future direction from it.
 
 Expansion represents observed range expansion or release from compression. Expansion is an observation, not a signal.
 
 Compression and expansion must not be converted into breakout predictions, directional recommendations, or trade instructions.
 
-## 11. Confluence
+## 13. Confluence
 
 Confluence describes multiple observations appearing near the same price area or context.
 
-Confluence may increase activity significance because more observations point to an area of participant attention.
+Confluence may increase chart display relevance because more visible observations overlap around the same area.
 
 Confluence does not imply:
 
@@ -186,64 +244,94 @@ Confluence does not imply:
 - entry validity
 - target validity
 
-## 12. Scoring Philosophy
+## 14. Score Rule
 
-Scores measure market-activity significance only.
+The score is only a visual priority score.
 
-Scores may consider neutral observations such as:
+The score is not:
 
-- timeframe context
-- recency
-- observed interaction
-- confluence
-- compression or expansion observations
-- candle observations near relevant areas
+- a trade score
+- a probability score
+- a quality score
+- an outcome score
+- a strength or weakness score
+
+Higher score means more visible. Lower score means less visually prominent. Valid information must still remain visible.
+
+Permitted score inputs are observable chart facts only:
+
+- zone age
+- interaction count
+- retest count
+- timeframe weight
+- overlap count
+- compression proximity
 - structural relevance
+- break / flip state
+- close location after interaction
+- distance moved after interaction
 
-Scores must not measure:
+Scores must not imply:
 
-- probability of profit
-- trade quality
-- expected success
-- expected direction
-- recommendation strength
-- whether a zone will hold
-- whether a zone will break
+- strength
+- weakness
+- conviction
+- dominance
+- defense quality
+- exhaustion
+- probability
+- prediction
+- expected continuation
+- expected failure
+- trade opportunity
+- entry quality
+- exit quality
 
-Scores are display aids for prioritizing chart-reading attention. They are not trading instructions.
+Do not attach narrative market conclusions to the score. The only score question is:
 
-The only question answered by a score is:
+> Which valid chart facts should be displayed more prominently so the chart remains readable?
 
-> How significant is this observation from a market-activity perspective?
-
-## 13. Simplicity Principle
+## 15. Simplicity Principle
 
 TDSS v2.1 must remain simple enough to be useful.
 
-The objective is not to model every possible market behavior. The objective is to provide a usable decision-support map.
+The objective is not to model market participants or every possible market behavior. The objective is to provide a usable chart-observation map.
 
 TDSS v2.1 should reject:
 
 - unnecessary complexity
 - metrics that do not improve practical chart reading
 - speculative behavioral models
+- participant-psychology or intent models
+- dominance, exhaustion, trapped-participant, defense-capacity, or winning/losing inferences
 - redundant labels
 - hidden assumptions
 - features that imply prediction or recommendation
 
-When a proposed feature adds complexity, it must be accepted only if it improves neutral chart interpretation and can be explained clearly.
+When a proposed feature adds complexity, it must be accepted only if it improves neutral chart reading and can be displayed simply.
 
-## 14. Explainability
+## 16. Display Simplicity
 
-Every visual element must be explainable through:
+The chart should stay simple.
 
-- WHAT: what the element is
-- WHY: why it exists
-- IMPACT: how participant activity may be affected or why the observation may be relevant
+TDSS may display:
 
-Explanations must remain neutral. They must not tell the trader what to do.
+- observations
+- detections
+- comparisons
+- score-based visual priority
 
-## 15. Documentation Principles
+TDSS should avoid:
+
+- long text explanations
+- narrative labels
+- market storytelling
+- behavioral conclusions
+- score explanations that sound like market conclusions
+
+The user interprets the chart. TDSS displays chart facts clearly.
+
+## 17. Documentation Principles
 
 Project documentation must separate business truth from implementation detail.
 
@@ -256,9 +344,9 @@ Required documentation roles:
 - `CHANGELOG.md`: historical evolution, version history, and major decisions.
 - `MIGRATION.md`: legacy mapping and Keep / Refactor / Remove decisions.
 
-Documentation must be understandable by human developers, AI coding agents, and future maintainers.
+Documentation must describe every feature through OBSERVATION, DETECTION, COMPARISON, or DISPLAY. It must remain understandable by human developers, AI coding agents, and future maintainers.
 
-## 16. Prohibited Outputs
+## 18. Prohibited Outputs
 
 TDSS v2.1 must never generate, display, infer, score, or suggest:
 
@@ -278,7 +366,13 @@ TDSS v2.1 must never generate, display, infer, score, or suggest:
 - high probability trade
 - probability of success
 - expected outcome
+- buyer/seller exhaustion
+- trapped buyers or trapped sellers
+- participant conviction
+- participant dominance
+- defense capacity
+- who is winning
 
-## 17. Final Objective
+## 19. Final Objective
 
-TDSS v2.1 provides a behavioral map of market participation. It reveals where participant activity may be relevant. It does not decide.
+TDSS v2.1 provides a chart-observation map using OBSERVATION → DETECTION → COMPARISON → DISPLAY. It reveals visible structure, zones, interactions, compression, expansion, confluence, and state changes. It does not infer participant psychology, intent, dominance, or future outcomes. It does not decide.

@@ -4,7 +4,7 @@
 
 This repository is the documentation hub and implementation workspace for TDSS v2.1, a MetaTrader 5 market observation and contextualization indicator.
 
-TDSS v2.1 is a decision-support system. It observes, classifies, scores activity significance, visualizes, and explains market context. It does not generate signals, predictions, trade recommendations, entries, exits, targets, stop-loss guidance, probability of success, or expected outcome. The trader remains the sole decision maker.
+TDSS v2.1 is a chart-observation decision-support system. It uses one operating model: Observation → Detection → Comparison → Display. It does not model participant psychology or intent, determine who is winning, generate signals, predictions, trade recommendations, entries, exits, targets, stop-loss guidance, probability of success, or expected outcome. The trader remains the sole decision maker.
 
 ## Current Phase
 
@@ -15,15 +15,16 @@ The current work establishes:
 - revised SOT v2.1 business truth
 - clarified retest philosophy
 - clarified Support / Resistance interpretation
-- clarified activity-significance scoring philosophy
+- clarified score-as-display-priority philosophy
 - simplicity principle
 - project-wide documentation standard
 - Phase 2 zone lifecycle foundation
 - neutral retest interaction tracking
-- activity-score v1 for visual priority
-- WHAT / WHY / IMPACT explainability for zones
+- display-priority score v1 for visual priority only
+- concise zone display text organized as Observation / Detection / Comparison / Display
+- operating-model re-centering: TDSS maps visible chart behavior and does not infer participant psychology, intent, dominance, exhaustion, defense capacity, or expected outcomes
 
-Phase 2 remains limited to observational zone handling. It does not add signal, prediction, automation, execution, or recommendation behavior.
+Phase 2 remains limited to observational zone handling under Observation → Detection → Comparison → Display. It does not add signal, prediction, automation, execution, recommendation behavior, participant-state inference, or psychological explanation.
 
 ## Documentation Standard
 
@@ -65,10 +66,10 @@ Each project document has a distinct role:
 3. Keep changes limited to the approved phase.
 4. Preserve existing behavior only when it aligns with TDSS v2.1 neutrality.
 5. Keep documentation aligned with approved implementation changes.
-6. Verify that no output becomes a trade signal, prediction, expected outcome, probability statement, or recommendation.
+6. Verify that no output becomes a trade signal, prediction, expected outcome, probability statement, recommendation, participant-psychology inference, dominance inference, or intent inference.
 
 ## Phase 2 Status
 
-Phase 2 has started in a controlled scope focused on support/resistance zone lifecycle, neutral retest semantics, activity scoring v1, explainability, and score-based visual hierarchy.
+Phase 2 has started in a controlled scope focused on support/resistance zone lifecycle, neutral retest semantics, score-based display priority, and readable chart display.
 
-The next recommended step is chart-level validation of zone persistence, score explanations, and neutral displayed terminology before expanding Phase 2.
+The next recommended step is chart-level validation of zone persistence, score display-priority text, and neutral displayed terminology before expanding Phase 2.
